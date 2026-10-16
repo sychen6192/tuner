@@ -50,6 +50,22 @@ describe('PitchTracker', () => {
     expect(seen.reduce((a, b) => a + b) / seen.length).toBeCloseTo(10, 0)
   })
 
+  it('holds a steady note to within a tenth of a cent at the detector noise level', () => {
+    // The detector's single-frame noise on a clean note is about ±0.3 cents.
+    const tracker = new PitchTracker(BASE)
+    const rand = random(5)
+    let t = run(tracker, 0, 1, () => detuned(57, 10 + (rand() - 0.5) * 0.6))
+    const pen: number[] = []
+    const figure: number[] = []
+    for (let i = 0; i < 200; i++, t += HOP) {
+      tracker.push({ time: t, frequency: detuned(57, 10 + (rand() - 0.5) * 0.6), clarity: 0.97, level: -20 })
+      pen.push(tracker.current.cents!)
+      figure.push(tracker.current.steady!)
+    }
+    expect((Math.max(...pen) - Math.min(...pen)) / 2).toBeLessThan(0.1)
+    expect((Math.max(...figure) - Math.min(...figure)) / 2).toBeLessThan(0.1)
+  })
+
   it('follows a turning peg without lagging behind', () => {
     const tracker = new PitchTracker(BASE)
     // Sweeping up 40 cents per second, as when tightening a string, then stopping at +10.
@@ -137,6 +153,39 @@ describe('PitchTracker', () => {
     run(tracker, 0, 0.2, () => detuned(69, 12)) // A4: a fourth above the top string
     expect(tracker.current).toMatchObject({ string: null, midi: 69 })
     expect(tracker.current.cents).toBeCloseTo(12, 0)
+  })
+
+  it('does not flicker between a string and a note three semitones beyond it', () => {
+    const rand = random(11)
+    for (const offset of [-2, 0, 2]) {
+      const tracker = new PitchTracker({ ...BASE, strings: strings('guitar') })
+      const seen = new Set<string>()
+      let t = run(tracker, 0, 0.3, () => detuned(67, offset))
+      for (let i = 0; i < 200; i++, t += HOP) {
+        tracker.push({ time: t, frequency: detuned(67, offset + (rand() - 0.5)), clarity: 0.97, level: -20 })
+        seen.add(`${tracker.current.string}/${tracker.current.midi}`)
+      }
+      expect([...seen], `G4 ${offset} cents`).toEqual(['null/67'])
+      expect(tracker.current.inTune).toBe(true)
+    }
+  })
+
+  it('switches notes past the true midpoint in unequal temperaments', () => {
+    // Quarter-comma meantone: C to C♯ is a 76-cent chromatic semitone.
+    const meantone = temperamentOffsets('meantone', 0)
+    const tracker = new PitchTracker({ ...BASE, offsets: meantone })
+    const c4 = 440 * 2 ** ((meantone[0]! - 900) / 1200)
+    const cSharp4 = 440 * 2 ** ((meantone[1]! - 800) / 1200)
+    let t = run(tracker, 0, 0.3, () => c4)
+    expect(tracker.current.midi).toBe(60)
+    // Glide up to 20 cents below C♯: well past the midpoint (38 cents above C).
+    t = run(
+      tracker,
+      t,
+      0.5,
+      (time) => c4 * 2 ** ((Math.min(1, (time - t) / 0.4) * (1200 * Math.log2(cSharp4 / c4) - 20)) / 1200),
+    )
+    expect(tracker.current.midi).toBe(61)
   })
 
   it('measures against the temperament and the reference pitch', () => {

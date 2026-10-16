@@ -46,8 +46,8 @@
                 </span>
               </button>
               <p class="readout">
-                <span class="readout-cents"><span id="cents-sign" class="sign"></span><output id="cents">0.0</output><span class="unit">&#x00A2;</span></span>
-                <span class="readout-hz"><output id="hz">440.0</output><span class="unit">Hz</span></span>
+                <span class="readout-cents"><span id="cents-sign" class="sign"></span><span id="cents" class="figure">0.0</span><span class="unit">&#x00A2;</span></span>
+                <span class="readout-hz"><span id="hz" class="figure">440.0</span><span class="unit">Hz</span></span>
               </p>
             </div>
             <button id="higher" class="step" type="button" data-i18n-label="higher" aria-label="升半音">
@@ -174,16 +174,22 @@
             <span class="shortcut" data-i18n="shortcutTone">R 參考音</span>
             <span class="shortcut" data-i18n="shortcutCalibrate">C 校準</span>
           </p>
+          <label class="shortcut-switch">
+            <input id="letter-shortcuts" type="checkbox" checked />
+            <span data-i18n="letterShortcuts">使用字母快捷鍵（R、C）</span>
+          </label>
         </section>
       </main>
     </div>
 
-    <div id="toast" class="toast" role="status" hidden>
-      <span id="toast-text"></span>
-      <button id="toast-action" class="toast-action" type="button" hidden></button>
-      <button id="toast-close" class="toast-close" type="button" data-i18n-label="dismiss" aria-label="關閉">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-      </button>
+    <div id="toast-region" class="toast-region" role="status" aria-live="polite">
+      <div id="toast" class="toast" hidden>
+        <span id="toast-text"></span>
+        <button id="toast-action" class="toast-action" type="button" hidden></button>
+        <button id="toast-close" class="toast-close" type="button" data-i18n-label="dismiss" aria-label="關閉">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
     </div>
   </body>
 </html>

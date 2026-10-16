@@ -222,7 +222,7 @@ button svg {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 10px;
   border-radius: 20px;
   color: var(--ink-2);
@@ -245,7 +245,7 @@ button svg {
 
 .language button {
   min-width: 44px;
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 10px;
   border-radius: 999px;
   color: var(--ink-2);
@@ -415,12 +415,12 @@ button svg {
   white-space: nowrap;
 }
 
-.readout output {
+.readout .figure {
   display: inline-block;
   text-align: right;
 }
 
-.readout-cents output {
+.readout-cents .figure {
   min-width: 2.6ch;
 }
 
@@ -433,7 +433,7 @@ button svg {
   translate: 0 -0.08em;
 }
 
-.readout-hz output {
+.readout-hz .figure {
   min-width: 4.4ch;
 }
 
@@ -543,13 +543,10 @@ button svg {
   translate: 0 3px;
 }
 
-.no-engraved .scale-figure-sign {
-  font-size: 9px;
-}
-
-.scale-sign {
+.no-engraved .scale-sign {
   font-size: 13px;
   font-weight: 700;
+  translate: none;
 }
 
 .scale-zone {
@@ -633,7 +630,7 @@ button svg {
 }
 
 .swatch-label {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* Captioned as a textbook captions its figure: the time span, then how to read it. */
@@ -661,20 +658,22 @@ button svg {
 
 /* ---------------------------------------------------------------- strings */
 
+/* Up to 44 px each; seven strings on a 320 px phone shrink a little rather than overflow. */
 .strings {
   --count: 6;
   display: grid;
-  grid-template-columns: repeat(var(--count), 44px);
+  grid-template-columns: repeat(var(--count), minmax(0, 44px));
   justify-content: center;
-  gap: clamp(6px, 3vw, 18px);
+  gap: clamp(4px, 2vw, 18px);
 }
 
 /* String numerals are the target buttons: ring = listening for it, yellow = locked, chalk = in tune. */
 .string {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 100%;
+  max-width: 44px;
+  aspect-ratio: 1;
   border: 2px solid var(--path);
   border-radius: 50%;
   background: var(--ground);
@@ -856,11 +855,17 @@ button svg {
   gap: clamp(4px, 2vw, 14px);
 }
 
+.reference .step {
+  flex: none;
+}
+
+/* Takes the room between − and +, so the buttons stay put as the figures change width. */
 .reference-mark {
   display: flex;
+  flex: 1 1 auto;
   align-items: baseline;
   gap: 0.22em;
-  min-width: 6.4em;
+  min-width: 0;
   justify-content: center;
   font-family: var(--score);
   font-size: clamp(1.25rem, 5.6vw, 1.625rem);
@@ -988,7 +993,7 @@ button svg {
   --thumb-w: 22px;
   --thumb-h: 22px;
   width: 100%;
-  height: 40px;
+  height: 44px;
   margin: 0;
   background: transparent;
   cursor: pointer;
@@ -1096,9 +1101,29 @@ button svg {
   margin-inline: 0.5em;
 }
 
+/* Letter shortcuts can be switched off: speech input types letters too (WCAG 2.1.4). */
+.shortcut-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 8px;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.shortcut-switch input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
 /* Keyboard shortcuts are irrelevant on touch-only devices. */
 @media (hover: none) and (pointer: coarse) {
-  .shortcuts {
+  .shortcuts,
+  .shortcut-switch {
     display: none;
   }
 }
@@ -1144,7 +1169,7 @@ button svg {
 }
 
 .toast-action {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 10px;
   background: var(--yellow);
@@ -1156,8 +1181,8 @@ button svg {
   display: grid;
   flex: none;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
   color: var(--ground);
 }
@@ -1233,7 +1258,8 @@ button svg {
     border-radius: 20px;
   }
 
-  .settings > .shortcuts {
+  .settings > .shortcuts,
+  .settings > .shortcut-switch {
     grid-column: 1 / -1;
   }
 }
@@ -1274,11 +1300,8 @@ button svg {
   }
 
   .scale-figure,
-  .scale-figure-sign {
-  font-size: 9px;
-}
-
-.scale-sign {
+  .scale-figure-sign,
+  .scale-sign {
     fill: CanvasText;
   }
 
@@ -1290,6 +1313,11 @@ button svg {
     forced-color-adjust: none;
     fill: Highlight;
     stroke: Canvas;
+  }
+
+  /* The canvas reads these colours; keep the system colours chosen here, not forced ones. */
+  .trace-swatches > * {
+    forced-color-adjust: none;
   }
 
   .swatch-line {
@@ -1312,6 +1340,23 @@ button svg {
   .note,
   .string {
     border-color: CanvasText;
+  }
+
+  /* The string being heard: a wider ring, since colour can't tell it apart here. */
+  .string.current {
+    border-width: 4px;
+  }
+
+  .toast {
+    border: 1px solid CanvasText;
+  }
+
+  .toast-action {
+    border: 2px solid ButtonText;
+  }
+
+  .text-button {
+    border: 1px solid ButtonText;
   }
 
   .note.locked,

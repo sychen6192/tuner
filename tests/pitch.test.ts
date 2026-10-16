@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PitchDetector, levelDb, windowSizeFor } from '../src/core/pitch'
-import { CHROMATIC_RANGE } from '../src/core/instruments'
+import { CHROMATIC_RANGE, searchRange, strings } from '../src/core/instruments'
 import { acf2plus } from './support/acf2plus'
 import { cents, midiToHz, random, tone, type ToneOptions } from './support/signals'
 
@@ -104,6 +104,18 @@ describe('PitchDetector', () => {
     const noise = Float32Array.from({ length: chromatic.bufferSize }, () => rand() * 2 - 1)
     const heard = chromatic.detect(noise)
     expect(heard === null || heard.clarity < 0.6).toBe(true)
+  })
+
+  it('keeps a sharp top note in its octave, and refuses notes far above the range', () => {
+    const range = searchRange(strings('bass'), 440)
+    const bass = new PitchDetector({ sampleRate: 48000, minFrequency: range.min, maxFrequency: range.max })
+    // 7th-fret harmonic on the G string (D4), played 40 cents sharp.
+    const d4 = midiToHz(62) * 2 ** (40 / 1200)
+    const harmonic = bass.detect(tone({ frequency: d4, length: bass.bufferSize, harmonics: [1, 0.3] }))
+    expect(Math.abs(cents(harmonic!.frequency, d4))).toBeLessThan(1)
+    // G4 is far above a bass: no reading, rather than a confident one an octave low.
+    const g4 = bass.detect(tone({ frequency: midiToHz(67), length: bass.bufferSize, harmonics: [1, 0.3] }))
+    expect(g4).toBeNull()
   })
 
   it('does not report pitches outside the instrument range', () => {

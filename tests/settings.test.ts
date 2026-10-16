@@ -29,6 +29,7 @@ describe('sanitizeSettings', () => {
         sensitivity: 3,
         toneVoice: 'saw',
         toneVolume: -1,
+        letterShortcuts: 'no',
       }),
     ).toEqual({ ...defaultSettings(), a4: 490, sensitivity: 1, toneVolume: 0 })
   })
@@ -45,6 +46,7 @@ describe('sanitizeSettings', () => {
       accidentals: 'flat' as const,
       tolerance: 1 as const,
       toneVoice: 'sine' as const,
+      letterShortcuts: false,
       language: 'en' as const,
     }
     expect(sanitizeSettings(JSON.parse(JSON.stringify(settings)))).toEqual(settings)

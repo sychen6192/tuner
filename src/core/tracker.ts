@@ -87,8 +87,12 @@ const SETTLE_TIME = 0.25
 const NOTE_HYSTERESIS = 8
 /** A different string takes over only when it is this much closer, cents. */
 const STRING_HYSTERESIS = 40
-/** Beyond this distance from every string, a note is shown as itself, cents. */
-const STRING_REACH = 300
+/**
+ * Beyond this distance from every string, a note is shown as itself, cents. Halfway between
+ * semitones, so no in-tune note sits on the boundary, with hysteresis either side of it.
+ */
+const STRING_REACH = 250
+const REACH_HYSTERESIS = 8
 /** The steady reading looks back this far, seconds: a few cycles of any vibrato. */
 const STEADY_WINDOW = 0.5
 
@@ -318,8 +322,10 @@ export class PitchTracker {
     const nearest = nearestNote(frequency, a4, offsets)
     const current = this.state.midi
     if (current !== null && current !== nearest.midi) {
+      // Past the true midpoint between the two notes by the hysteresis: in unequal temperaments
+      // neighbouring notes are not 100 cents apart, so the midpoint is not always at 50.
       const fromCurrent = centsBetween(frequency, noteFrequency(current, a4, offsets))
-      if (Math.abs(fromCurrent) < 50 + NOTE_HYSTERESIS) return current
+      if (Math.abs(fromCurrent) - Math.abs(nearest.cents) < 2 * NOTE_HYSTERESIS) return current
     }
     return nearest.midi
   }
@@ -331,8 +337,9 @@ export class PitchTracker {
     const distance = (i: number) => Math.abs(centsBetween(frequency, noteFrequency(strings[i]!, a4, offsets)))
     let best = 0
     for (let i = 1; i < strings.length; i++) if (distance(i) < distance(best)) best = i
-    if (distance(best) > STRING_REACH) return null
     const current = this.state.string
+    const reach = current === null ? STRING_REACH - REACH_HYSTERESIS : STRING_REACH + REACH_HYSTERESIS
+    if (distance(best) > reach) return null
     if (current !== null && current < strings.length && current !== best) {
       if (distance(current) - distance(best) < STRING_HYSTERESIS) return current
     }

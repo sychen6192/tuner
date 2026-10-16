@@ -40,6 +40,8 @@ export interface Settings {
   toneVoice: ToneVoice
   /** Reference tone volume, 0–1. */
   toneVolume: number
+  /** Single-letter keyboard shortcuts (R, C); can be switched off for speech input (WCAG 2.1.4). */
+  letterShortcuts: boolean
   language: LanguagePreference
 }
 
@@ -58,6 +60,7 @@ export function defaultSettings(): Settings {
     sensitivity: 0.6,
     toneVoice: 'reed',
     toneVolume: 0.6,
+    letterShortcuts: true,
     language: 'auto',
   }
 }
@@ -103,6 +106,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     sensitivity: unit(raw.sensitivity, defaults.sensitivity),
     toneVoice: oneOf(TONE_VOICES, raw.toneVoice, defaults.toneVoice),
     toneVolume: unit(raw.toneVolume, defaults.toneVolume),
+    letterShortcuts: typeof raw.letterShortcuts === 'boolean' ? raw.letterShortcuts : defaults.letterShortcuts,
     language: oneOf(LANGUAGE_PREFERENCES, raw.language, defaults.language),
   }
 }

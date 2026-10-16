@@ -1,4 +1,4 @@
-import type { StrobeBand } from '../core/strobe'
+import type { Reading } from '../core/analyser'
 
 /** Microphone samples from the capture worklet: one hop, mono. */
 export interface CaptureChunk {
@@ -18,15 +18,5 @@ export type AnalysisCommand =
   /** Listening stopped: drop the input and what was heard. */
   | { type: 'disconnect' }
 
-/** Analysis worker → main thread, once per hop. */
-export interface AnalysisResult {
-  type: 'reading'
-  time: number
-  frequency: number | null
-  clarity: number
-  level: number
-  /** Phase of the strobe bands against the target, when one is set and the signal is clear. */
-  strobe: StrobeBand[] | null
-  /** The target these bands were measured against. */
-  strobeTarget: number | null
-}
+/** Analysis worker → main thread, once per analysed hop. */
+export type AnalysisResult = { type: 'reading' } & Reading

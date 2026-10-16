@@ -29,7 +29,7 @@ jobs:
         uses: actions/configure-pages@v6
       - run: npm run build
         env:
-          # "/metronome" for a project site, "" for a custom domain.
+          # "/tuner" for a project site, "" for a custom domain.
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/
       - uses: actions/upload-pages-artifact@v5
         with:

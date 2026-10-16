@@ -23,19 +23,27 @@ class CaptureProcessor extends AudioWorkletProcessor {
   private buffer: Float32Array
   private filled = 0
   private target: MessagePort | null = null
+  /** Told to stop: process() returns false so the node can be collected. */
+  private done = false
 
   constructor(options: { processorOptions?: unknown }) {
     super()
     this.hop = ((options.processorOptions ?? { hop: 512 }) as CaptureOptions).hop
     this.buffer = new Float32Array(this.hop)
-    this.port.onmessage = (event: MessageEvent<{ port?: MessagePort }>) => {
+    this.port.onmessage = (event: MessageEvent<{ port?: MessagePort; stop?: boolean }>) => {
+      if (event.data.stop) {
+        this.target = null
+        this.done = true
+        this.port.onmessage = null
+        return
+      }
       this.target = event.data.port ?? null
     }
   }
 
   process(inputs: Float32Array[][]): boolean {
     const channels = inputs[0]
-    if (!channels || channels.length === 0 || !this.target) return true
+    if (!channels || channels.length === 0 || !this.target) return !this.done
     const frames = channels[0]!.length
     for (let i = 0; i < frames; i++) {
       // Mono mix. Some phones deliver the microphone on one channel of a stereo pair (WebKit
@@ -54,7 +62,7 @@ class CaptureProcessor extends AudioWorkletProcessor {
         this.filled = 0
       }
     }
-    return true
+    return !this.done
   }
 }
 

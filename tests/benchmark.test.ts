@@ -34,7 +34,7 @@ const CASES: Case[] = [
     tone: { harmonics: [0, 1, 0.8, 0.6, 0.4, 0.3], noise: 0.005 },
   },
   {
-    name: 'Voice-like tone in noise (SNR ≈ 20 dB)',
+    name: 'Voice-like tone in noise (SNR ≈ 14 dB)',
     midis: [48, 55, 60, 64, 67, 72],
     tone: { harmonics: [1, 0.7, 0.5, 0.4, 0.2, 0.1], noise: 0.06 },
   },

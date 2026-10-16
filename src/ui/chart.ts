@@ -68,6 +68,8 @@ export class Chart {
   private strobePhase: number[] = STROBE_HARMONICS.map(() => 0)
   private strobeTarget: number | null = null
   private lastPen: Pen = { state: 'idle', cents: null, inTune: false }
+  /** The moment the paper was last drawn at, so a resize or theme change redraws it as it was. */
+  private lastNow: number | null = null
 
   constructor(
     private readonly scale: SVGSVGElement,
@@ -86,14 +88,17 @@ export class Chart {
       window.matchMedia(query).addEventListener('change', () => {
         this.colours = null
         this.buildScale()
+        this.redraw()
       })
     }
+    this.watchPixelRatio()
     this.resize()
   }
 
   setTolerance(tolerance: number): void {
     this.tolerance = tolerance
     this.placeZone()
+    this.redraw()
   }
 
   add(point: TracePoint): void {
@@ -107,6 +112,7 @@ export class Chart {
   /** Rename the notes already drawn (after a change of naming or language). */
   relabel(label: (midi: number) => string): void {
     for (const point of this.points) point.label = label(point.midi)
+    this.redraw()
   }
 
   clear(): void {
@@ -115,8 +121,26 @@ export class Chart {
 
   /** Draw the paper as of `now`, the pen point at `cents`, and the strobe. */
   draw(now: number, pen: Pen): void {
+    this.lastNow = now
     this.drawPen(pen)
     this.drawTrace(now)
+  }
+
+  /** Draw the paper again as it was last drawn (the canvas was cleared or recoloured). */
+  private redraw(): void {
+    if (this.lastNow !== null) this.drawTrace(this.lastNow)
+  }
+
+  /** A move to a screen of another pixel density re-sizes the canvas bitmap. */
+  private watchPixelRatio(): void {
+    window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`).addEventListener(
+      'change',
+      () => {
+        this.resize()
+        this.watchPixelRatio()
+      },
+      { once: true },
+    )
   }
 
   /**
@@ -153,9 +177,11 @@ export class Chart {
     this.ratio = Math.min(3, window.devicePixelRatio || 1)
     this.width = rect.width
     this.height = rect.height
+    // Setting the size clears the bitmap, so the paper is drawn again straight after.
     this.canvas.width = Math.round(rect.width * this.ratio)
     this.canvas.height = Math.round(rect.height * this.ratio)
     this.buildScale()
+    this.redraw()
   }
 
   /** The engraved scale: a tick every 5 cents, long ticks and figures at 0 and ±25, ♭ and ♯ at the ends. */
@@ -184,7 +210,7 @@ export class Chart {
         ticks.push(figure)
       }
     }
-    ticks.push(text('♭', this.x(-RANGE), base - 16, 'scale-sign'), text('♯', this.x(RANGE), base - 16, 'scale-sign'))
+    ticks.push(accidentalText(-1, this.x(-RANGE), base - 16), accidentalText(1, this.x(RANGE), base - 16))
     const baseline = svg('line', { class: 'scale-base', x1: this.x(-RANGE), x2: this.x(RANGE), y1: base, y2: base })
     this.zero.setAttribute('x1', String(this.x(0)))
     this.zero.setAttribute('x2', String(this.x(0)))
@@ -292,6 +318,17 @@ function svg<K extends keyof SVGElementTagNameMap>(
 ): SVGElementTagNameMap[K] {
   const element = document.createElementNS(SVG_NS, tag)
   for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value))
+  return element
+}
+
+/** ♭ or ♯ at the end of the scale: engraved, with the plain b or # for when that face is blocked. */
+function accidentalText(accidental: -1 | 1, x: number, y: number): SVGTextElement {
+  const element = text('', x, y, 'scale-sign')
+  const engraved = svg('tspan', { class: 'acc' })
+  engraved.textContent = accidental > 0 ? '♯' : '♭'
+  const plain = svg('tspan', { class: 'acc-plain' })
+  plain.textContent = accidental > 0 ? '#' : 'b'
+  element.append(engraved, plain)
   return element
 }
 

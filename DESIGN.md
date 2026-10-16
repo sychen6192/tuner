@@ -162,7 +162,7 @@ The metronome's palette, unchanged, plus one role: the in-tune zone.
 
 ### Neutral
 - **Slate / Raised / Deep** (#172036 / #1d2742 / #111a2d) and **Paper / Raised / Deep** (#f3f5f9 / #e7ebf3 / #d9dfeb): grounds, the legend panel, hovers in the legend.
-- **Chalk / Soft / Faint** (#eceff6 / #b4bdd2 / #8792ad) and **Navy / Soft / Faint** (#172036 / #44506c / #56617c): text and strokes. Chalk draws the in-tune trace and fills the in-tune disc; Soft Chalk draws the trace elsewhere, the octave figures and units; Faint Chalk the scale ticks, trace labels and idle states.
+- **Chalk / Soft / Faint** (#eceff6 / #b4bdd2 / #8792ad) and **Navy / Soft / Faint** (#172036 / #44506c / #56617c): text and strokes. Chalk draws the in-tune trace and fills the in-tune disc; Soft Chalk draws the trace elsewhere, its note labels (they cross the zone, where Faint Chalk would fall below 4.5:1), the octave figures and units; Faint Chalk the scale ticks and idle states.
 - **Rule** (#33405f / #c6cddc): hairlines, control borders, the scale baseline and the trace's centre line. Decorative only.
 - **Path** (ink at 60%): rings of listening discs and string numerals, the strobe stripes.
 - **Zone** (ink at 7%): the in-tune column, running from the scale down the paper, ±tolerance wide.
@@ -184,12 +184,12 @@ The metronome's palette, unchanged, plus one role: the in-tune zone.
 - **Readout** (score 700, 1.25rem, tabular lining figures): cents and hertz beneath the disc. Signs are set at 0.72em because the face's + and − are math-width.
 - **Reference mark** (score 700, up to 1.625rem): "A4 = 440 Hz" in the legend, the twin of the metronome's tempo mark.
 - **String numerals** (score 700, 1.0625rem, octave at 0.62em).
-- **Scale figures** (score 700, 12px; signs 9px): 0 and ±25, with ♭ and ♯ at the ends.
+- **Scale figures** (score 700, 12px; signs 9px): 0 and ±25, with engraved ♭ and ♯ at 20px at the ends (13px plain b and # in the fallback).
 - **Labels, hints, buttons**: the metronome's sans sizes (0.9375rem 600 labels, 0.8125rem hints, 1.125rem 700 Start).
 
 **The Notation Voice Rule.** Any musical quantity (a note, an octave, cents, hertz, a key) is set in the score face with engraved accidentals; every instruction is system sans.
 
-**The Engraved Fallback Rule.** If the engraved face fails (`document.fonts.load`), the root takes `no-engraved` and accidentals become plain # and b in the score face.
+**The Engraved Fallback Rule.** If the engraved face fails (`document.fonts.load`), the root takes `no-engraved` and accidentals become plain # and b in the score face: in the HTML, at the scale's ends and in the trace labels alike. Native select menus (the temperament root) are drawn by the platform in its own face, so they show its ♯ and ♭.
 
 ## Layout
 
@@ -212,19 +212,19 @@ Circles for the note disc, step discs, string numerals, the pen point and the si
 - **Strobe:** three 6px bands of 9px stripes on an 18px period, inset 14px to match the scale's ends; band k shows the phase of the k-th harmonic (1, 2, 4) against the target, so it stands still in tune and runs at k·Δf. Opacity follows the harmonic's strength and fades between 15 and 40 cents off; at rest the bands sit at 16%.
 - **Scale:** a 1px rule baseline; ticks every 5 cents (6px, faint), long ticks at 0 and ±25 (11px, soft); the 0 mark is a 3px round-capped chalk bar that grows to 1.7× height when in tune, like the metronome's struck ictus. The zone runs behind it.
 - **Pen point:** an 8px-radius circle on the baseline, yellow with a 3px ground ring (navy with a yellow ring on paper); hollow faint ring at rest; 55% when holding; hollow yellow-edged ring when beyond ±50.
-- **Paper:** the zone column and a 1px centre rule full height; the trace in soft chalk, chalk where in tune, 1.5px to 3.4px by clarity with round caps; the pen lifts on a change of note or a pause over 0.12s; notes held 0.3s or more are labelled in score 13px faint ink beside their onset.
+- **Paper:** the zone column and a 1px centre rule full height; the trace in soft chalk, chalk where in tune, 1.5px to 3.4px by clarity with round caps; the pen lifts on a change of note or a pause over 0.12s; notes held 0.3s or more are labelled in score 13px soft ink beside their onset.
 - **Caption:** "6 s" in score face, then the hint in label small.
 
 ### String numerals
 44px circles in a centred row, one per string. Path ring; chalk ring when that string is being heard; yellow when locked; solid chalk when in tune.
 
 ### Buttons, segments, selects, sliders, toast
-As the metronome: Start is the yellow pill with the lift; secondary pills with rule borders (Calibrate and Tone take the yellow edge and 18% tint when active); 52px step discs (44px in the legend) with hold-to-repeat on the reference; segments 48px with score-face note names; selects with drawn chevrons; sliders with a 4px track and a 22px thumb. The sensitivity slider pairs with a 14px signal lamp, a ring that fills chalk while the input passes the gate.
+As the metronome: Start is the yellow pill with the lift; secondary pills with rule borders (Calibrate and Tone take the yellow edge and 18% tint when active); 52px step discs (44px in the legend) with hold-to-repeat on the reference; segments 48px with score-face note names; selects with drawn chevrons; sliders with a 4px track and a 22px thumb in a 44px hit area. The sensitivity slider pairs with a 14px signal lamp, a ring that fills chalk while the input passes the gate. Every target is at least 44px: the language pills, Install, the toast's action and close buttons. The toast's polite live region is always in the page; problems (microphone refused, audio interrupted) stay until closed, plain messages for at least 6s and never while hovered or focused. A switch under the shortcuts turns the letter shortcuts off.
 
 ### Theme, motion and access modes
 - **Light/dark:** follows the system; every token has both values, and the canvas reads its colours from CSS swatches so it follows too.
 - **Reduced motion:** transitions off; the strobe is hidden; the zero mark thickens instead of growing.
-- **Forced colours:** strokes and ticks in CanvasText; pen point, in-tune fills and the lit lamp in Highlight; locked targets CanvasText fills; strobe stripes CanvasText; every control border ButtonText.
+- **Forced colours:** strokes, ticks and scale figures in CanvasText; pen point, in-tune fills and the lit lamp in Highlight; locked targets CanvasText fills; the string being heard a 4px ring; strobe stripes CanvasText; every control border ButtonText, the toast and its action included.
 - **Screen readers:** a polite live region speaks the note, its side and cents (or "in tune") on each change and every few seconds while holding.
 
 ## Do's and Don'ts
@@ -238,5 +238,5 @@ As the metronome: Start is the yellow pill with the lift; secondary pills with r
 ### Don't:
 - **Don't** flash, pulse or animate anything that is not a reading.
 - **Don't** add a second accent hue, or tint surfaces with yellow beyond the pressed 18% mix.
-- **Don't** use Unicode music symbols in a system face; accidentals come from the engraved subset or fall back to # and b.
+- **Don't** use Unicode music symbols in a system face; accidentals come from the engraved subset or fall back to # and b (native select menus excepted, which the platform draws).
 - **Don't** replace the pen and paper with a swinging-needle gauge; the scale and trace are the meter.

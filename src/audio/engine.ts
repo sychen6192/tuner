@@ -1,5 +1,6 @@
 import captureUrl from './capture.worklet.ts?worker&url'
 import { useAudioSession } from '../platform/audioSession'
+import type { Reading } from '../core/analyser'
 import type { AnalysisCommand, AnalysisResult } from './messages'
 import { ReferenceTone } from './tone'
 
@@ -12,8 +13,11 @@ export class ListenFailure extends Error {
   }
 }
 
-/** Listening stopped without the page asking: the microphone went away, or a call took the audio. */
-export type ListenEnd = 'device' | 'interrupted'
+/**
+ * Listening stopped without the page asking: the microphone went away ('device'), a call or the
+ * system took the audio ('interrupted'), or the analysis worker failed to load ('failed').
+ */
+export type ListenEnd = 'device' | 'interrupted' | 'failed'
 
 /** Let the audio device sleep this long after everything stops (saves battery on phones). */
 const SUSPEND_AFTER_MS = 1500
@@ -26,9 +30,9 @@ const RESUME_TIMEOUT_MS = 4000
  *   microphone → AudioWorklet (mono, hops, audio-clock frames) → MessagePort → analysis Worker
  *              → readings → main thread
  *
- * The browser's voice processing (echo cancellation, noise suppression, automatic gain) is
- * switched off: it is built for speech, and it smears pitch and pumps the level of a held note.
- * Nothing heavy runs on the audio thread or the main thread.
+ * The browser's voice processing (echo cancellation, noise suppression, automatic gain, voice
+ * isolation) is switched off: it is built for speech, and it smears pitch and pumps the level of
+ * a held note. Nothing heavy runs on the audio thread or the main thread.
  */
 export class TunerEngine {
   readonly tone: ReferenceTone
@@ -46,10 +50,14 @@ export class TunerEngine {
   private target: number | null = null
   /** Voice processing the browser kept on despite being asked not to, from the track settings. */
   private processing: string[] = []
+  /** The page asked for the suspend now under way, so the 'suspended' it causes is not news. */
+  private suspending = false
 
   constructor(
-    private readonly onReading: (reading: AnalysisResult) => void,
+    private readonly onReading: (reading: Reading) => void,
     private readonly onEnd: (reason: ListenEnd) => void,
+    /** The system stopped the reference tone (a call, Siri); the page stops it itself otherwise. */
+    private readonly onToneEnd: () => void,
   ) {
     this.tone = new ReferenceTone(
       () => this.ensureContext(),
@@ -58,6 +66,9 @@ export class TunerEngine {
         this.scheduleSuspend()
       },
     )
+    // Load the worker now, while this version's files are certainly on the server and in the
+    // offline cache, not at the first Start (which may come after an update replaced them).
+    this.worker = this.createWorker()
   }
 
   get listening(): boolean {
@@ -69,9 +80,13 @@ export class TunerEngine {
     return this.processing
   }
 
-  /** Must be called from a user gesture (click/keydown): browsers keep audio off until then. */
-  async start(): Promise<void> {
-    if (this.running) return
+  /**
+   * Open the microphone and start analysing. Must be called from a user gesture (click/keydown):
+   * browsers keep audio off until then. Resolves true once listening, false if a later start()
+   * or stop() superseded this one; rejects with a ListenFailure.
+   */
+  async start(): Promise<boolean> {
+    if (this.running) return false
     const media = navigator.mediaDevices
     if (!media?.getUserMedia) throw new ListenFailure(window.isSecureContext ? 'unsupported' : 'insecure')
     if (typeof AudioWorkletNode === 'undefined') throw new ListenFailure('unsupported')
@@ -90,16 +105,17 @@ export class TunerEngine {
       await this.loadModule(ctx)
       if (generation !== this.generation) {
         stopTracks(stream)
-        return
+        return false
       }
       this.connect(ctx, stream)
+      return true
     } catch (error) {
       if (stream) stopTracks(stream)
-      if (generation === this.generation) {
-        this.running = false
-        useAudioSession(this.tone.playing ? 'playback' : 'auto')
-        this.scheduleSuspend()
-      }
+      // A start that was superseded reports nothing; the newer one speaks for itself.
+      if (generation !== this.generation) return false
+      this.running = false
+      useAudioSession(this.tone.playing ? 'playback' : 'auto')
+      this.scheduleSuspend()
       throw error instanceof ListenFailure ? error : new ListenFailure(listenError(error))
     }
   }
@@ -133,33 +149,57 @@ export class TunerEngine {
     }
     const ctx = new AudioContext({ latencyHint: 'interactive' })
     ctx.addEventListener('statechange', () => {
-      // A phone call or Siri ('interrupted'), or the context closing, takes the microphone away.
-      // The page only suspends the context itself when nothing is running.
+      // A phone call or Siri ('interrupted'), the system suspending the audio, or the context
+      // closing takes the microphone and the tone away. The page's own idle suspend is not news,
+      // even when it lands after a new start() has begun.
       const state: string = ctx.state
-      if (state === 'running') return
-      if (this.running) {
+      const own = this.suspending
+      this.suspending = false
+      if (state === 'running' || (state === 'suspended' && own)) return
+      if (this.running && this.capture) {
         this.stop()
         this.onEnd('interrupted')
       }
-      if (state !== 'suspended') this.tone.stop()
+      if (this.tone.playing) {
+        this.tone.stop()
+        this.onToneEnd()
+      }
     })
     this.ctx = ctx
     return ctx
   }
 
   private loadModule(ctx: AudioContext): Promise<void> {
-    this.moduleReady ??= ctx.audioWorklet.addModule(captureUrl).catch((error: unknown) => {
+    // A module that fails to load (a stale file after an update, offline) is not the microphone's
+    // fault, whatever DOMException addModule() rejects with.
+    this.moduleReady ??= ctx.audioWorklet.addModule(captureUrl).catch(() => {
       this.moduleReady = null
-      throw error
+      throw new ListenFailure('failed')
     })
     return this.moduleReady
+  }
+
+  private createWorker(): Worker {
+    const worker = new Worker(new URL('./analysis.worker.ts', import.meta.url), { type: 'module' })
+    worker.onmessage = (event: MessageEvent<AnalysisResult>) => {
+      if (this.running) this.onReading(event.data)
+    }
+    worker.onerror = worker.onmessageerror = () => {
+      worker.terminate()
+      if (this.worker === worker) this.worker = null
+      if (this.running) {
+        this.stop()
+        this.onEnd('failed')
+      }
+    }
+    return worker
   }
 
   private connect(ctx: AudioContext, stream: MediaStream): void {
     this.stream = stream
     const track = stream.getAudioTracks()[0]
     const settings = (track?.getSettings() ?? {}) as Record<string, unknown>
-    this.processing = ['echoCancellation', 'noiseSuppression', 'autoGainControl'].filter(
+    this.processing = ['echoCancellation', 'noiseSuppression', 'autoGainControl', 'voiceIsolation'].filter(
       (key) => settings[key] === true,
     )
     track?.addEventListener('ended', () => {
@@ -168,12 +208,7 @@ export class TunerEngine {
       this.onEnd('device')
     })
 
-    if (!this.worker) {
-      this.worker = new Worker(new URL('./analysis.worker.ts', import.meta.url), { type: 'module' })
-      this.worker.onmessage = (event: MessageEvent<AnalysisResult>) => {
-        if (this.running) this.onReading(event.data)
-      }
-    }
+    this.worker ??= this.createWorker()
     const channel = new MessageChannel()
     this.post({ type: 'connect', port: channel.port1, sampleRate: ctx.sampleRate }, [channel.port1])
     if (this.range) this.post(this.range)
@@ -198,6 +233,9 @@ export class TunerEngine {
 
   private disconnect(): void {
     this.source?.disconnect()
+    // Let the processor end (its process() returns false), so the node can be collected rather
+    // than kept running by the audio thread for the life of the page.
+    this.capture?.port.postMessage({ stop: true })
     this.capture?.disconnect()
     this.source = null
     this.capture = null
@@ -213,7 +251,9 @@ export class TunerEngine {
   private scheduleSuspend(): void {
     clearTimeout(this.suspendTimer)
     this.suspendTimer = window.setTimeout(() => {
-      if (!this.running && !this.tone.playing) void this.ctx?.suspend()
+      if (this.running || this.tone.playing || !this.ctx || this.ctx.state !== 'running') return
+      this.suspending = true
+      void this.ctx.suspend()
     }, SUSPEND_AFTER_MS)
   }
 }

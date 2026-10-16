@@ -1,5 +1,5 @@
-metronome-wordmark.woff2 ("Metronome Wordmark") is a subset of Noto Serif TC Bold, holding only
-the glyphs of 節拍器. Copyright notice carried in the font:
+tuner-wordmark.woff2 ("Tuner Wordmark") is a subset of Noto Serif TC Bold, holding only
+the glyphs of 調音器. Copyright notice carried in the font:
 (c) 2017-2024 Adobe (http://www.adobe.com/).
 Noto is a trademark of Google LLC.
 

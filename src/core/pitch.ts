@@ -37,6 +37,8 @@ export interface PitchEstimate {
   frequency: number
   /** NSDF height at the period, 0–1: 1 is perfectly periodic. */
   clarity: number
+  /** True when the octave came from the hint rather than from the window alone. */
+  fromHint: boolean
 }
 
 /** Periods per window at the lowest frequency; the NSDF needs more than 2 to see one repeat. */
@@ -46,10 +48,20 @@ const MIN_WINDOW_S = 0.021
 const MAX_WINDOW_S = 0.18
 /** A period repeating this much better at twice its length is half of the real one. */
 const OCTAVE_MARGIN = 0.035
+/**
+ * With a hint an octave below, the longer period wins on a smaller margin than OCTAVE_MARGIN,
+ * but it must still repeat better: a clean tone repeats equally well at T and 2T, and a tie
+ * belongs to T (or every upward octave leap would read an octave low).
+ */
+const HINT_MARGIN = 0.003
+/** Headroom above the highest frequency searched, so a sharp top note keeps its octave. */
+const MAX_HEADROOM = 2 ** (100 / 1200)
 /** Repeats used for refinement must stay this periodic (relative to the period's own peak). */
 const REPEAT_TOLERANCE = 0.2
 /** Fewer repeats than this in the base window: measure again over the long window. */
 const MIN_REPEATS = 3
+/** The long window is only worth its FFT for a period this clear (the tracker wants 0.75). */
+const LONG_WINDOW_CLARITY = 0.5
 
 export function windowSizeFor(sampleRate: number, minFrequency: number): number {
   const size = Math.ceil((PERIODS_PER_WINDOW * sampleRate) / minFrequency)
@@ -158,7 +170,7 @@ export class PitchDetector {
     this.bufferSize = Math.max(this.windowSize, bufferSizeFor(options.sampleRate))
     // The NSDF is only meaningful while at least half the window overlaps itself.
     const maxLag = Math.min(Math.floor(this.windowSize / 2), Math.ceil(options.sampleRate / options.minFrequency) + 2)
-    this.minLag = Math.max(2, Math.floor(options.sampleRate / options.maxFrequency) - 1)
+    this.minLag = Math.max(2, Math.floor(options.sampleRate / (options.maxFrequency * MAX_HEADROOM)))
     this.base = new Nsdf(this.windowSize, maxLag)
     this.long = new Nsdf(this.bufferSize, Math.floor(this.bufferSize / 2))
   }
@@ -177,16 +189,24 @@ export class PitchDetector {
     let tallest = 0
     for (const lag of keyMaxima) tallest = Math.max(tallest, n[lag]!)
     const chosen = keyMaxima.find((lag) => n[lag]! >= this.threshold * tallest)!
+    // Above the range: no reading, rather than a confident one an octave or a twelfth low.
+    if (chosen < this.minLag) return null
     let period = interpolate(n, chosen)
 
     // Half of a longer period? (Weak fundamental, strong 2nd harmonic.)
     const double = this.base.peakNear(2 * period.lag)
     if (double && double.value > period.value + OCTAVE_MARGIN) period = double
 
-    if (hint !== undefined && hint > 0) period = this.followHint(period, hint)
+    let fromHint = false
+    if (hint !== undefined && hint > 0) {
+      const hinted = this.followHint(period, hint)
+      fromHint = hinted !== period
+      period = hinted
+    }
 
     let refined = this.base.refine(period.lag, period.value)
-    if (refined.repeats < MIN_REPEATS && samples.length >= this.bufferSize && this.long.compute(samples)) {
+    const lowNote = refined.repeats < MIN_REPEATS && period.value >= LONG_WINDOW_CLARITY
+    if (lowNote && samples.length >= this.bufferSize && this.long.compute(samples)) {
       // A low note: measure the same period over the long window. If the note only just began,
       // the long window still holds the previous one and its peak is weaker; keep the base then.
       const peak = this.long.peakNear(refined.lag)
@@ -195,10 +215,14 @@ export class PitchDetector {
         if (longer.repeats >= refined.repeats) refined = longer
       }
     }
-    return { frequency: this.sampleRate / refined.lag, clarity: Math.min(1, period.value) }
+    return { frequency: this.sampleRate / refined.lag, clarity: Math.min(1, period.value), fromHint }
   }
 
-  /** The highest lag of each positive lobe after the first negative dip, within the lag range. */
+  /**
+   * The highest lag of each positive lobe after the first negative dip, up to the longest lag.
+   * Lobes below minLag are kept, so a note above the range is recognised (and refused) rather
+   * than read at a multiple of its period.
+   */
   private keyMaxima(n: Float64Array): number[] {
     const maxLag = this.base.maxLag
     const result: number[] = []
@@ -213,28 +237,29 @@ export class PitchDetector {
       if (best >= 0) {
         if (v > n[best]!) best = tau
         if (prev > 0 && v <= 0) {
-          if (best >= this.minLag) result.push(best)
+          result.push(best)
           best = -1
         }
       }
     }
     // A lobe still open at the end counts only if its peak is a real peak, not the cut-off.
-    if (best >= this.minLag && best < maxLag && n[best]! >= n[best + 1]!) result.push(best)
+    if (best >= 0 && best < maxLag && n[best]! >= n[best + 1]!) result.push(best)
     return result
   }
 
   /**
-   * A reading an octave from the note just held is usually the same note heard through its
-   * 2nd harmonic or a passing sub-harmonic. Keep the held octave if the window supports it.
+   * A reading an octave from the note just held may be the same note heard through its 2nd
+   * harmonic (or a passing sub-harmonic). Keep the held octave only where the window itself
+   * favours it, however slightly; where it doesn't, the new octave is real.
    */
   private followHint(period: Peak, hint: number): Peak {
     const cents = 1200 * Math.log2(this.sampleRate / period.lag / hint)
     if (Math.abs(cents - 1200) < 60) {
       const longer = this.base.peakNear(2 * period.lag)
-      if (longer && longer.value >= 0.8 && longer.value >= period.value - 0.1) return longer
+      if (longer && longer.value >= 0.8 && longer.value > period.value + HINT_MARGIN) return longer
     } else if (Math.abs(cents + 1200) < 60 && period.lag / 2 >= this.minLag) {
       const shorter = this.base.peakNear(period.lag / 2)
-      if (shorter && shorter.value >= 0.85 && shorter.value >= period.value - 0.05) return shorter
+      if (shorter && shorter.value >= 0.85 && shorter.value >= period.value - HINT_MARGIN) return shorter
     }
     return period
   }

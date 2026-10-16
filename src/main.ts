@@ -1,6 +1,6 @@
 import './style.css'
 import { ListenFailure, TunerEngine, type ListenEnd } from './audio/engine'
-import type { AnalysisResult } from './audio/messages'
+import type { Reading } from './core/analyser'
 import { MIN_CALIBRATION_READINGS, calibrate } from './core/calibrate'
 import { INSTRUMENT_GROUPS, searchRange } from './core/instruments'
 import {
@@ -54,9 +54,9 @@ const els = {
   noteOctave: byId('note-octave'),
   lower: byId<HTMLButtonElement>('lower'),
   higher: byId<HTMLButtonElement>('higher'),
-  cents: byId<HTMLOutputElement>('cents'),
+  cents: byId('cents'),
   centsSign: byId('cents-sign'),
-  hz: byId<HTMLOutputElement>('hz'),
+  hz: byId('hz'),
   strobe: byId('strobe'),
   scale: document.getElementById('scale') as unknown as SVGSVGElement,
   trace: byId<HTMLCanvasElement>('trace'),
@@ -86,6 +86,7 @@ const els = {
   voices: byId('voices'),
   volume: byId<HTMLInputElement>('volume'),
   install: byId<HTMLButtonElement>('install'),
+  letterShortcuts: byId<HTMLInputElement>('letter-shortcuts'),
   languageButtons: document.querySelectorAll<HTMLButtonElement>('[data-language]'),
 }
 
@@ -100,8 +101,13 @@ function storage(): Storage | undefined {
   }
 }
 
-// Web fonts can be blocked (e.g. iOS Lockdown Mode); accidentals then fall back to # and b.
-const withoutEngraved = () => document.documentElement.classList.add('no-engraved')
+// Web fonts can be blocked (e.g. iOS Lockdown Mode); accidentals then fall back to # and b. The
+// HTML swaps by CSS; the trace labels are drawn text, so they are written again.
+const plainAccidentals = () => document.documentElement.classList.contains('no-engraved')
+const withoutEngraved = () => {
+  document.documentElement.classList.add('no-engraved')
+  chart.relabel(labelOf)
+}
 document.fonts?.load('1em "Tuner Engraved"', '♯').then((faces) => {
   if (faces.length === 0) withoutEngraved()
 }, withoutEngraved)
@@ -150,7 +156,7 @@ const tracker = new PitchTracker(trackerConfig())
 let tuner: TunerState = tracker.current
 let level = -Infinity
 
-const engine = new TunerEngine(onReading, onListenEnd)
+const engine = new TunerEngine(onReading, onListenEnd, onToneEnd)
 const wakeLock = new ScreenWakeLock()
 const chart = new Chart(els.scale, els.trace, els.strobe, els.swatches)
 
@@ -169,7 +175,7 @@ function update(patch: Partial<Settings>): void {
   if (patch.naming !== undefined || patch.accidentals !== undefined || patch.transposition !== undefined) {
     buildStrings()
     buildRootOptions()
-    chart.relabel((midi) => noteText(nameOf(midi)))
+    chart.relabel(labelOf)
   }
   retune()
   render()
@@ -177,13 +183,13 @@ function update(patch: Partial<Settings>): void {
   saveTimer = window.setTimeout(() => saveSettings(storage(), settings), 300)
 }
 
-/** Settings or the lock changed: the tracker, strobe and tone follow. */
+/** Settings or the lock changed: the tracker, strobe and tone follow (letting go keeps the tone). */
 function retune(): void {
   tracker.configure(trackerConfig())
   tuner = tracker.current
   engine.setTarget(tuner.target)
   if (toneMidi !== null) {
-    toneMidi = toneTarget()
+    toneMidi = lockedMidi() ?? toneMidi
     engine.tone.setFrequency(frequencyOf(toneMidi))
   }
 }
@@ -196,11 +202,16 @@ function applyRange(): void {
 const nameOf = (midi: number): NoteName =>
   noteName(midi, { naming: settings.naming, accidentals: settings.accidentals, transposition: settings.transposition })
 const frequencyOf = (midi: number) => noteFrequency(midi, settings.a4, offsets())
+/** A note's name as the trace writes it (plain # and b without the engraved face). */
+const labelOf = (midi: number) => {
+  const text = noteText(nameOf(midi))
+  return plainAccidentals() ? text.replace('♯', '#').replace('♭', 'b') : text
+}
 
 // ---------------------------------------------------------------------------------------------
 // Readings
 
-function onReading(reading: AnalysisResult): void {
+function onReading(reading: Reading): void {
   tuner = tracker.push(reading)
   level = reading.level
   if (tuner.target !== null) engine.setTarget(tuner.target)
@@ -212,7 +223,7 @@ function onReading(reading: AnalysisResult): void {
       cents: tuner.cents,
       clarity: reading.clarity,
       midi: tuner.midi,
-      label: noteText(nameOf(tuner.midi)),
+      label: labelOf(tuner.midi),
       inTune: tuner.inTune,
     })
   }
@@ -233,11 +244,29 @@ function onReading(reading: AnalysisResult): void {
 
 function onListenEnd(reason: ListenEnd): void {
   afterStop()
-  showToast(reason === 'device' ? 'micEnded' : 'audioInterrupted')
+  const message: Record<ListenEnd, MessageKey> = {
+    device: 'micEnded',
+    interrupted: 'audioInterrupted',
+    failed: 'analysisFailed',
+  }
+  showToast(message[reason], undefined, undefined, true)
+}
+
+/** The system stopped the reference tone (a call, Siri): say so and settle the screen. */
+function onToneEnd(): void {
+  if (toneMidi === null) return
+  toneMidi = null
+  if (!engine.listening) void wakeLock.release()
+  els.status.textContent = t('toneInterrupted')
+  render()
+  showToast('toneInterrupted', undefined, undefined, true)
 }
 
 // ---------------------------------------------------------------------------------------------
 // Rendering
+
+/** While stopped the paper holds still at the moment listening ended, whatever else redraws it. */
+let pausedAt: number | null = null
 
 let frameRequested = false
 function requestFrame(): void {
@@ -280,11 +309,12 @@ function renderTuner(): void {
   els.note.dataset.state = state
   els.note.classList.toggle('locked', lock !== null)
   const locked = lockedMidi()
+  const lockable = lockCandidate()
   const label =
     locked !== null
       ? t('noteLocked', { note: spokenNote(nameOf(locked)) })
-      : shown
-        ? t('noteAuto', { note: spokenNote(nameOf(shown.midi)) })
+      : lockable !== null
+        ? t('noteAuto', { note: spokenNote(nameOf(lockable)) })
         : t('noteAutoIdle')
   if (els.note.getAttribute('aria-label') !== label) els.note.setAttribute('aria-label', label)
   if (shown) {
@@ -306,7 +336,8 @@ function renderTuner(): void {
   els.note.dataset.side = shown?.cents == null ? '' : shown.cents < -0.05 ? 'flat' : shown.cents > 0.05 ? 'sharp' : ''
 
   const pen: PenState = toneMidi !== null ? 'idle' : !engine.listening ? 'idle' : tuner.status
-  chart.draw(performance.now() / 1000, {
+  const paperTime = engine.listening || pausedAt === null ? performance.now() / 1000 : pausedAt
+  chart.draw(paperTime, {
     state: pen,
     cents: pen === 'idle' || pen === 'waiting' ? null : tuner.cents,
     inTune: tuner.inTune && toneMidi === null,
@@ -345,11 +376,14 @@ function announce(): void {
   const changed = tuner.midi !== lastAnnouncement.midi || tuner.inTune !== lastAnnouncement.inTune
   if (!changed && now - lastAnnouncement.time < 3000) return
   if (changed && now - lastAnnouncement.time < 700) return
-  const note = spokenNote(nameOf(tuner.midi))
+  // Inside the tolerance but not yet settled: wait for the verdict rather than say "0 cents".
   const cents = Math.round(Math.abs(tuner.steady))
+  if (!tuner.inTune && (Math.abs(tuner.steady) <= settings.tolerance || cents === 0)) return
+  const note = spokenNote(nameOf(tuner.midi))
+  const side = tuner.steady < 0 ? 'statusFlat' : 'statusSharp'
   const text = tuner.inTune
     ? t('statusInTune', { note })
-    : t(tuner.steady < 0 ? 'statusFlat' : 'statusSharp', { note, cents })
+    : t(cents === 1 ? (`${side}One` as const) : side, { note, cents })
   lastAnnouncement = { text, time: now, midi: tuner.midi, inTune: tuner.inTune }
   els.status.textContent = text
 }
@@ -400,6 +434,7 @@ function render(): void {
     t('sensitivityValue', { n: Math.round(settings.sensitivity * 100), db: Math.round(gateFor(settings.sensitivity)) }),
   )
   setSlider(els.volume, Math.round(settings.toneVolume * 100))
+  els.letterShortcuts.checked = settings.letterShortcuts
 
   // The ♭/♯ buttons pick a note in chromatic mode; strings have their own buttons.
   els.noteMark.classList.toggle('instrument', isInstrument())
@@ -431,29 +466,45 @@ function renderTransport(): void {
   els.listen.classList.toggle('playing', listening)
   els.listenLabel.textContent = listening ? t('stop') : t('listen')
   els.tone.setAttribute('aria-pressed', String(toneMidi !== null))
-  els.calibrate.classList.toggle('active', calibration !== null)
-  els.calibrateLabel.textContent = calibration ? t('calibrating') : t('calibrate')
+  const calibrating = calibration !== null || calibrationPending !== null
+  els.calibrate.classList.toggle('active', calibrating)
+  els.calibrateLabel.textContent = calibrating ? t('calibrating') : t('calibrate')
   document.body.classList.toggle('is-listening', listening)
 }
 
 // ---------------------------------------------------------------------------------------------
 // Actions
 
-/** `quiet`: don't report a failure (resuming on return to the app, where it may need a tap). */
-async function startListening(quiet = false): Promise<boolean> {
-  if (engine.listening) return true
+/** The start in progress, so a second request (Calibrate, a double tap) waits for the same one. */
+let pendingStart: Promise<boolean> | null = null
+
+/**
+ * Open the microphone and listen. Resolves true once listening. `quiet`: don't report a failure
+ * (resuming on return to the app, where it may need a tap).
+ */
+function startListening(quiet = false): Promise<boolean> {
+  if (pendingStart) return pendingStart
+  if (engine.listening) return Promise.resolve(true)
+  pendingStart = beginListening(quiet).finally(() => (pendingStart = null))
+  return pendingStart
+}
+
+async function beginListening(quiet: boolean): Promise<boolean> {
   stopTone()
   tracker.reset()
   tuner = tracker.current
   chart.clear()
+  pausedAt = null
   applyRange()
   const starting = engine.start()
   renderTransport()
+  let connected: boolean
   try {
-    await starting
+    connected = await starting
   } catch (error) {
-    renderTransport()
-    renderTuner()
+    cancelCalibration()
+    if (toneMidi === null) void wakeLock.release()
+    render()
     if (quiet) return false
     const reason = error instanceof ListenFailure ? error.reason : 'failed'
     const message: Record<typeof reason, MessageKey> = {
@@ -464,18 +515,35 @@ async function startListening(quiet = false): Promise<boolean> {
       unsupported: 'micUnsupported',
       failed: 'micFailed',
     }
-    showToast(message[reason])
+    showToast(message[reason], undefined, undefined, true)
     return false
   }
-  if (!engine.listening) return false
-  dismissToast('audioInterrupted')
+  // Superseded: stopped (or restarted) while the microphone was opening.
+  if (!connected) {
+    render()
+    return false
+  }
+  for (const message of LISTEN_PROBLEMS) dismissToast(message)
   void wakeLock.request()
-  if (engine.forcedProcessing.length > 0) showToast('processingOn')
+  if (engine.forcedProcessing.length > 0) showToast('processingOn', undefined, undefined, true)
   els.status.textContent = t('statusListening')
   renderTransport()
   requestFrame()
   return true
 }
+
+/** Problems that listening successfully makes obsolete. */
+const LISTEN_PROBLEMS: readonly MessageKey[] = [
+  'micDenied',
+  'micMissing',
+  'micBusy',
+  'micInsecure',
+  'micUnsupported',
+  'micFailed',
+  'micEnded',
+  'audioInterrupted',
+  'analysisFailed',
+]
 
 function stopListening(): void {
   if (!engine.listening) return
@@ -484,9 +552,10 @@ function stopListening(): void {
   els.status.textContent = t('statusStopped')
 }
 
-/** Listening ended (by the user or not): settle the screen. */
+/** Listening ended (by the user or not): settle the screen, and hold the paper still. */
 function afterStop(): void {
   cancelCalibration()
+  pausedAt = performance.now() / 1000
   tracker.reset()
   tuner = tracker.current
   if (toneMidi === null) void wakeLock.release()
@@ -539,15 +608,25 @@ function stepTarget(direction: -1 | 1): void {
   render()
 }
 
+/** What tapping the note disc would lock: the string or note being heard (or sounded), if any. */
+function lockCandidate(): number | null {
+  if (isInstrument()) {
+    if (tuner.string !== null) return strings()[tuner.string] ?? null
+    return toneMidi !== null && strings().includes(toneMidi) ? toneMidi : null
+  }
+  return toneMidi ?? tuner.midi ?? lastMidi
+}
+
 /** The note disc: lock what is sounding now, or let go of the lock. */
 function toggleLock(): void {
   if (lock) {
     lock = null
   } else if (isInstrument()) {
-    if (tuner.string === null) return
-    lock = { kind: 'string', index: tuner.string }
+    const index = tuner.string ?? (toneMidi !== null ? strings().indexOf(toneMidi) : -1)
+    if (index < 0) return
+    lock = { kind: 'string', index }
   } else {
-    const midi = toneMidi ?? tuner.midi ?? lastMidi
+    const midi = lockCandidate()
     if (midi === null) return
     lock = { kind: 'note', midi }
   }
@@ -572,16 +651,25 @@ function changeA4(direction: -1 | 1, fine = false): void {
 // --- Calibration: listen for an A and make it the reference
 
 let calibration: { readings: number[]; timer: number } | null = null
+/** A calibration waiting for the microphone to open (a token, so a cancel can't be undone). */
+let calibrationPending: object | null = null
 const CALIBRATION_TIMEOUT_MS = 6000
 
 async function toggleCalibration(): Promise<void> {
-  if (calibration) {
+  if (calibration || calibrationPending) {
     cancelCalibration()
     renderTransport()
     return
   }
-  if (!(await startListening())) return
-  calibration = { readings: [], timer: window.setTimeout(finishCalibration, CALIBRATION_TIMEOUT_MS) }
+  const token = {}
+  calibrationPending = token
+  renderTransport()
+  const listening = await startListening()
+  if (calibrationPending !== token) return // cancelled while the microphone was opening
+  calibrationPending = null
+  if (listening && engine.listening) {
+    calibration = { readings: [], timer: window.setTimeout(finishCalibration, CALIBRATION_TIMEOUT_MS) }
+  }
   renderTransport()
 }
 
@@ -590,7 +678,7 @@ function finishCalibration(): void {
   const result = calibrate(calibration.readings)
   cancelCalibration()
   if (result === null) {
-    showToast('calibrateFailed')
+    showToast('calibrateFailed', undefined, undefined, true)
   } else {
     const previous = settings.a4
     update({ a4: result })
@@ -600,6 +688,7 @@ function finishCalibration(): void {
 }
 
 function cancelCalibration(): void {
+  calibrationPending = null
   if (!calibration) return
   clearTimeout(calibration.timer)
   calibration = null
@@ -698,7 +787,11 @@ function buildControls(): void {
   radios(
     els.tolerances,
     'tolerance',
-    TOLERANCES.map((n) => ({ value: String(n), label: t('toleranceValue', { n }), content: `±${n}` })),
+    TOLERANCES.map((n) => ({
+      value: String(n),
+      label: t(n === 1 ? 'toleranceValueOne' : 'toleranceValue', { n }),
+      content: `±${n}`,
+    })),
   )
   radios(
     els.voices,
@@ -734,7 +827,7 @@ function applyLanguage(language: Language): void {
   setLanguage(language)
   translatePage()
   buildControls()
-  chart.relabel((midi) => noteText(nameOf(midi)))
+  chart.relabel(labelOf)
   render()
   renderToast()
 }
@@ -794,6 +887,7 @@ function bindEvents(): void {
   })
   els.sensitivity.addEventListener('input', () => update({ sensitivity: els.sensitivity.valueAsNumber / 100 }))
   els.volume.addEventListener('input', () => update({ toneVolume: els.volume.valueAsNumber / 100 }))
+  els.letterShortcuts.addEventListener('change', () => update({ letterShortcuts: els.letterShortcuts.checked }))
 
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('keyup', (event) => {
@@ -831,9 +925,10 @@ function onKeyDown(event: KeyboardEvent): void {
     return
   }
   if (isTextEntry(target)) return
+  // Single-letter shortcuts can be switched off (WCAG 2.1.4): speech input types letters too.
   const key = event.key.toLowerCase()
-  if (key === 'r' && !event.repeat) return toggleTone()
-  if (key === 'c' && !event.repeat) return void toggleCalibration()
+  if (settings.letterShortcuts && key === 'r' && !event.repeat) return toggleTone()
+  if (settings.letterShortcuts && key === 'c' && !event.repeat) return void toggleCalibration()
   if (event.key === 'Escape') return unlock()
   // Let sliders and radio groups keep their own arrow-key behaviour.
   if (target instanceof HTMLElement && target.matches('input, select, textarea')) return

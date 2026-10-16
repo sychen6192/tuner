@@ -33,7 +33,7 @@ The metronome's twin: the same music-room chalkboard, score type and single yell
 - Transposing instruments (C, B♭, A, F, E♭), letter or fixed-do solfège names, accidental spelling style.
 - In-tune tolerance ±1–10 cents; microphone sensitivity (level gate) with a signal lamp.
 - Reference tone (reed or sine) in the current temperament.
-- Keyboard shortcuts: Space listen, ←/→ note or string, Esc automatic, ↑/↓ reference (Shift ±0.1), R tone, C calibrate.
+- Keyboard shortcuts: Space listen, ←/→ note or string, Esc automatic, ↑/↓ reference (Shift ±0.1), R tone, C calibrate. The letter shortcuts can be switched off (WCAG 2.1.4).
 - Languages: Traditional Chinese and English, auto-detected with a manual switch. Light and dark themes following the system.
 - PWA: static build (Vite + TypeScript, no UI framework), AudioWorklet capture and a Web Worker for analysis, offline service worker, deployed to GitHub Pages and Cloudflare Workers.
 
@@ -56,4 +56,4 @@ Accuracy figures come from the repository's own tests on synthetic signals (`npm
 
 ## Accessibility & Inclusion
 
-Keyboard operable and screen-reader labelled, with spoken readings ("A4, 3 cents sharp") through a polite live region; WCAG AA contrast in both themes; respects reduced motion (the strobe, which is motion by nature, is hidden; the pen and figures carry the same reading) and Windows contrast themes; 44 px or larger touch targets.
+Keyboard operable and screen-reader labelled, with spoken readings ("A4, 3 cents sharp") through a polite live region; WCAG AA contrast in both themes; respects reduced motion (the strobe, which is motion by nature, is hidden; the pen and figures carry the same reading) and Windows contrast themes; 44 px or larger touch targets (a seven-string row on a 320 px screen shrinks to about 36 px rather than overflow).
