@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>調音器 Tuner</title>
+    <meta name="description" content="精準、可離線使用的半音階調音器：真頻閃、音準軌跡、律制、移調、參考音。A precise offline chromatic tuner." />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#172036" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f3f5f9" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/pwa-192x192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <meta name="apple-mobile-web-app-title" content="調音器" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <h1 class="brand">
+          <img class="brand-mark" src="/pwa-64x64.png" srcset="/pwa-64x64.png 1x, /pwa-192x192.png 3x" width="28" height="28" alt="" />
+          <span data-i18n="appTitle">調音器</span>
+        </h1>
+        <div class="topbar-actions">
+          <button id="install" class="text-button" type="button" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" /></svg>
+            <span data-i18n="install">安裝 App</span>
+          </button>
+          <div class="language" role="group" data-i18n-label="language" aria-label="語言">
+            <button type="button" data-language="zh-Hant" lang="zh-Hant" aria-pressed="false">中文</button>
+            <button type="button" data-language="en" lang="en" aria-pressed="false">EN</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="stage">
+          <div id="note-mark" class="note-mark">
+            <button id="lower" class="step" type="button" data-i18n-label="lower" aria-label="降半音">
+              <span class="step-glyph" aria-hidden="true"><span class="acc">&#x266D;</span><span class="acc-plain">b</span></span>
+            </button>
+            <div class="note-block">
+              <button id="note" class="note" type="button" data-state="idle" aria-pressed="false">
+                <span class="note-name" aria-hidden="true">
+                  <span id="note-step" class="note-step">A</span><span id="note-accidental" class="note-accidental"></span><span id="note-octave" class="note-octave">4</span>
+                </span>
+              </button>
+              <p class="readout">
+                <span class="readout-cents"><span id="cents-sign" class="sign"></span><output id="cents">0.0</output><span class="unit">&#x00A2;</span></span>
+                <span class="readout-hz"><output id="hz">440.0</output><span class="unit">Hz</span></span>
+              </p>
+            </div>
+            <button id="higher" class="step" type="button" data-i18n-label="higher" aria-label="升半音">
+              <span class="step-glyph" aria-hidden="true"><span class="acc">&#x266F;</span><span class="acc-plain">#</span></span>
+            </button>
+          </div>
+
+          <figure class="chart">
+            <div id="strobe" class="strobe" aria-hidden="true">
+              <span class="band" data-harmonic="1"></span>
+              <span class="band" data-harmonic="2"></span>
+              <span class="band" data-harmonic="4"></span>
+            </div>
+            <div class="scale-wrap">
+              <svg id="scale" class="scale" aria-hidden="true"></svg>
+            </div>
+            <div class="trace-wrap">
+              <canvas id="trace" class="trace" aria-hidden="true"></canvas>
+              <span class="trace-swatches" aria-hidden="true">
+                <span class="swatch-line"></span><span class="swatch-true"></span><span class="swatch-zone"></span><span class="swatch-rule"></span><span class="swatch-label"></span>
+              </span>
+            </div>
+            <figcaption class="caption">
+              <span class="caption-time" aria-hidden="true">6&thinsp;s</span>
+              <span id="hint" class="hint" data-i18n="traceHint">筆跡記下最近 6 秒的音準；直直落下就是準</span>
+            </figcaption>
+          </figure>
+
+          <div id="strings-row" class="strings-row" hidden>
+            <div id="strings" class="strings" role="group" data-i18n-label="stringsGroup" aria-label="琴弦"></div>
+          </div>
+
+          <div class="transport">
+            <button id="calibrate" class="secondary" type="button" data-i18n-title="calibrateTitle">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5v7.2a3 3 0 0 0 6 0V3.5M12 13.7V20.5" /><path d="M4.5 8.5a6 6 0 0 0 0 5M19.5 8.5a6 6 0 0 1 0 5" /></svg>
+              <span id="calibrate-label" data-i18n="calibrate">校準</span>
+            </button>
+            <button id="listen" class="primary" type="button">
+              <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 5.2v13.6L18.6 12z" /></svg>
+              <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.2" y="6.2" width="11.6" height="11.6" rx="1.6" /></svg>
+              <span id="listen-label" data-i18n="listen">開始</span>
+            </button>
+            <button id="tone" class="secondary" type="button" aria-pressed="false" data-i18n-title="toneTitle">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h3.5L12 18V6L7.5 10zM15.5 9a4 4 0 0 1 0 6M18.2 6.3a7.8 7.8 0 0 1 0 11.4" /></svg>
+              <span data-i18n="tone">參考音</span>
+            </button>
+          </div>
+          <p id="status" class="sr-only" aria-live="polite"></p>
+        </section>
+
+        <section class="settings">
+          <div class="row">
+            <span id="a4-label" class="label" data-i18n="reference">標準音</span>
+            <div class="reference" role="group" aria-labelledby="a4-label">
+              <button id="a4-down" class="step small" type="button" data-i18n-label="a4Down" aria-label="調低標準音">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg>
+              </button>
+              <span class="reference-mark" aria-hidden="true">
+                <span class="reference-note">A<span class="reference-octave">4</span></span><span class="reference-equals">=</span><span id="a4-value" class="reference-value">440</span><span class="unit">Hz</span>
+              </span>
+              <output id="a4-output" class="sr-only" aria-live="polite">440 Hz</output>
+              <button id="a4-up" class="step small" type="button" data-i18n-label="a4Up" aria-label="調高標準音">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="row">
+            <label class="label" for="instrument" data-i18n="instrument">樂器</label>
+            <select id="instrument" class="select"></select>
+          </div>
+
+          <div class="row">
+            <label class="label" for="temperament" data-i18n="temperament">律制</label>
+            <div class="pair">
+              <select id="temperament" class="select"></select>
+              <select id="root" class="select root" data-i18n-label="root" aria-label="主音"></select>
+            </div>
+          </div>
+
+          <div class="row">
+            <span id="transposition-label" class="label" data-i18n="transposition">移調</span>
+            <div id="transpositions" class="segmented" role="radiogroup" aria-labelledby="transposition-label"></div>
+          </div>
+
+          <div class="row">
+            <span id="naming-label" class="label" data-i18n="naming">音名</span>
+            <div id="namings" class="segmented two" role="radiogroup" aria-labelledby="naming-label"></div>
+          </div>
+
+          <div class="row">
+            <span id="accidentals-label" class="label" data-i18n="accidentals">升降號</span>
+            <div id="accidental-styles" class="segmented three" role="radiogroup" aria-labelledby="accidentals-label"></div>
+          </div>
+
+          <div class="row">
+            <span id="tolerance-label" class="label" data-i18n="tolerance">準度範圍</span>
+            <div id="tolerances" class="segmented" role="radiogroup" aria-labelledby="tolerance-label"></div>
+          </div>
+
+          <div class="row">
+            <label class="label" for="sensitivity" data-i18n="sensitivity">靈敏度</label>
+            <div class="level">
+              <input id="sensitivity" class="slider" type="range" min="0" max="100" step="1" value="60" />
+              <span id="level-lamp" class="level-lamp" data-i18n-title="levelLamp" aria-hidden="true"></span>
+            </div>
+          </div>
+
+          <div class="row">
+            <span id="voice-label" class="label" data-i18n="toneVoice">參考音色</span>
+            <div id="voices" class="segmented two" role="radiogroup" aria-labelledby="voice-label"></div>
+          </div>
+
+          <div class="row">
+            <label class="label" for="volume" data-i18n="toneVolume">音量</label>
+            <input id="volume" class="slider" type="range" min="0" max="100" step="1" value="60" />
+          </div>
+
+          <p class="shortcuts">
+            <span class="shortcuts-label" data-i18n="shortcutsLabel">快捷鍵：</span>
+            <span class="shortcut" data-i18n="shortcutListen">空白鍵 開始／停止</span>
+            <span class="shortcut" data-i18n="shortcutNote">←→ 選音或選弦（Esc 自動）</span>
+            <span class="shortcut" data-i18n="shortcutA4">↑↓ 標準音（Shift ±0.1）</span>
+            <span class="shortcut" data-i18n="shortcutTone">R 參考音</span>
+            <span class="shortcut" data-i18n="shortcutCalibrate">C 校準</span>
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" hidden>
+      <span id="toast-text"></span>
+      <button id="toast-action" class="toast-action" type="button" hidden></button>
+      <button id="toast-close" class="toast-close" type="button" data-i18n-label="dismiss" aria-label="關閉">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+    </div>
+  </body>
+</html>

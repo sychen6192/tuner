@@ -1,0 +1,11 @@
+// Cloudflare Workers static assets: an assets-only Worker serving the Vite build output.
+// Deployed by .github/workflows/deploy-cloudflare.yml (`wrangler deploy` after `npm run build`).
+{
+  "name": "tuner",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Unknown paths get index.html instead of a 404 (single-page app).
+    "not_found_handling": "single-page-application"
+  }
+}

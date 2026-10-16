@@ -1,0 +1,289 @@
+import type { LanguagePreference } from './core/settings'
+
+const zh = {
+  appTitle: '調音器',
+  install: '安裝 App',
+  language: '語言',
+  listen: '開始',
+  stop: '停止',
+  lower: '目標降半音',
+  higher: '目標升半音',
+  noteAuto: '目標音：自動（{note}）。點一下鎖定這個音',
+  noteAutoIdle: '目標音：自動。開始聆聽後點一下可鎖定音高',
+  noteLocked: '目標音鎖定在 {note}。點一下恢復自動',
+  traceHint: '筆跡記下最近 6 秒的音準；直直落下就是準',
+  traceHintLocked: '目標已鎖定；點音名恢復自動',
+  stringsGroup: '琴弦',
+  stringAuto: '{n} 弦 {note}',
+  stringLocked: '{n} 弦 {note}（已鎖定）',
+  stringsHint: '點弦名鎖定；再點一次恢復自動',
+  calibrate: '校準',
+  calibrating: '聆聽 A 音…',
+  calibrateTitle: '演奏一個 A 音，把它設為標準音（C）',
+  tone: '參考音',
+  toneTitle: '播放目標音，用耳朵對音（R）',
+  reference: '標準音',
+  a4Down: '調低標準音',
+  a4Up: '調高標準音',
+  a4Value: 'A4 = {hz} Hz',
+  instrument: '樂器',
+  'group.chromatic': '半音階',
+  'group.guitar': '吉他',
+  'group.bass': '貝斯',
+  'group.ukulele': '烏克麗麗',
+  'group.strings': '弦樂器',
+  'group.folk': '其他',
+  'inst.chromatic': '半音階（任何音）',
+  'inst.guitar': '吉他・標準',
+  'inst.guitar-drop-d': '吉他・Drop D',
+  'inst.guitar-half-down': '吉他・降半音',
+  'inst.guitar-dadgad': '吉他・DADGAD',
+  'inst.guitar-open-g': '吉他・Open G',
+  'inst.guitar-open-d': '吉他・Open D',
+  'inst.guitar-7': '七弦吉他',
+  'inst.bass': '貝斯・四弦',
+  'inst.bass-5': '貝斯・五弦',
+  'inst.ukulele': '烏克麗麗・標準',
+  'inst.ukulele-low-g': '烏克麗麗・Low G',
+  'inst.ukulele-baritone': '烏克麗麗・Baritone',
+  'inst.violin': '小提琴',
+  'inst.viola': '中提琴',
+  'inst.cello': '大提琴',
+  'inst.double-bass': '低音提琴',
+  'inst.mandolin': '曼陀林',
+  'inst.banjo': '五弦斑鳩琴',
+  'inst.erhu': '二胡',
+  'inst.pipa': '琵琶',
+  temperament: '律制',
+  root: '主音',
+  'temp.equal': '十二平均律',
+  'temp.just': '純律',
+  'temp.pythagorean': '畢氏律',
+  'temp.meantone': '中全音律（¼ 音差）',
+  'temp.werckmeister3': '韋克邁斯特 III',
+  'temp.kirnberger3': '基恩貝格 III',
+  'temp.vallotti': '瓦洛蒂',
+  transposition: '移調',
+  'trans.0': 'C 調（實音）',
+  'trans.2': '降 B 調樂器：小號、單簧管、高音薩克斯風',
+  'trans.3': 'A 調樂器：A 調單簧管',
+  'trans.7': 'F 調樂器：法國號',
+  'trans.9': '降 E 調樂器：中音薩克斯風',
+  naming: '音名',
+  'naming.letter': '字母 C D E',
+  'naming.solfege': '唱名 Do Re Mi（固定唱法）',
+  accidentals: '升降號',
+  'acc.mixed': '常用：C♯ E♭ F♯ A♭ B♭',
+  'acc.sharp': '全用升記號',
+  'acc.flat': '全用降記號',
+  tolerance: '準度範圍',
+  toleranceValue: '±{n} 音分',
+  sensitivity: '靈敏度',
+  sensitivityValue: '{n}%，收音門檻 {db} dB',
+  levelLamp: '亮燈表示聽得到聲音',
+  toneVoice: '參考音色',
+  'voice.reed': '簧片',
+  'voice.sine': '正弦波',
+  toneVolume: '音量',
+  shortcutsLabel: '快捷鍵：',
+  shortcutListen: '空白鍵 開始／停止',
+  shortcutNote: '←→ 選音或選弦（Esc 自動）',
+  shortcutA4: '↑↓ 標準音（Shift ±0.1）',
+  shortcutTone: 'R 參考音',
+  shortcutCalibrate: 'C 校準',
+  sharpName: '升{step}',
+  flatName: '降{step}',
+  noteSpoken: '{name}{octave}',
+  statusListening: '正在聆聽',
+  statusStopped: '已停止聆聽',
+  statusInTune: '{note} 準了',
+  statusFlat: '{note} 偏低 {cents} 音分',
+  statusSharp: '{note} 偏高 {cents} 音分',
+  statusTone: '參考音 {note}',
+  updateAvailable: '有新版本可用',
+  reload: '重新載入',
+  offlineReady: '已可離線使用',
+  dismiss: '關閉',
+  undo: '復原',
+  micDenied: '需要麥克風權限才能調音：請在網址列或系統設定中允許',
+  micMissing: '找不到麥克風',
+  micBusy: '麥克風正被其他程式使用',
+  micInsecure: '麥克風只能在 HTTPS 網址下使用',
+  micUnsupported: '這個瀏覽器不支援即時音訊分析',
+  micFailed: '無法開啟麥克風，請再試一次',
+  micEnded: '麥克風已中斷，聆聽已停止',
+  audioInterrupted: '音訊被系統中斷，已停止聆聽',
+  processingOn: '瀏覽器仍在處理麥克風聲音（降噪或自動音量），準確度可能略受影響',
+  calibrated: '標準音已設為 A4 = {hz} Hz',
+  calibrateFailed: '沒聽到穩定的 A 音，標準音未變更',
+} as const
+
+export type MessageKey = keyof typeof zh
+
+const en: Record<MessageKey, string> = {
+  appTitle: 'Tuner',
+  install: 'Install app',
+  language: 'Language',
+  listen: 'Start',
+  stop: 'Stop',
+  lower: 'Target a semitone down',
+  higher: 'Target a semitone up',
+  noteAuto: 'Target: automatic ({note}). Tap to lock this note',
+  noteAutoIdle: 'Target: automatic. Once listening, tap to lock the pitch',
+  noteLocked: 'Target locked on {note}. Tap to go back to automatic',
+  traceHint: 'The pen draws the last 6 seconds of pitch; a straight fall is in tune',
+  traceHintLocked: 'Target locked; tap the note to go back to automatic',
+  stringsGroup: 'Strings',
+  stringAuto: 'String {n}, {note}',
+  stringLocked: 'String {n}, {note} (locked)',
+  stringsHint: 'Tap a string to lock it; tap again for automatic',
+  calibrate: 'Calibrate',
+  calibrating: 'Play an A…',
+  calibrateTitle: 'Play an A and make it the reference pitch (C)',
+  tone: 'Tone',
+  toneTitle: 'Play the target note to tune by ear (R)',
+  reference: 'Reference',
+  a4Down: 'Lower the reference pitch',
+  a4Up: 'Raise the reference pitch',
+  a4Value: 'A4 = {hz} Hz',
+  instrument: 'Instrument',
+  'group.chromatic': 'Chromatic',
+  'group.guitar': 'Guitar',
+  'group.bass': 'Bass',
+  'group.ukulele': 'Ukulele',
+  'group.strings': 'Orchestral strings',
+  'group.folk': 'Other',
+  'inst.chromatic': 'Chromatic (any note)',
+  'inst.guitar': 'Guitar · Standard',
+  'inst.guitar-drop-d': 'Guitar · Drop D',
+  'inst.guitar-half-down': 'Guitar · Half step down',
+  'inst.guitar-dadgad': 'Guitar · DADGAD',
+  'inst.guitar-open-g': 'Guitar · Open G',
+  'inst.guitar-open-d': 'Guitar · Open D',
+  'inst.guitar-7': '7-string guitar',
+  'inst.bass': 'Bass · 4-string',
+  'inst.bass-5': 'Bass · 5-string',
+  'inst.ukulele': 'Ukulele · Standard',
+  'inst.ukulele-low-g': 'Ukulele · Low G',
+  'inst.ukulele-baritone': 'Ukulele · Baritone',
+  'inst.violin': 'Violin',
+  'inst.viola': 'Viola',
+  'inst.cello': 'Cello',
+  'inst.double-bass': 'Double bass',
+  'inst.mandolin': 'Mandolin',
+  'inst.banjo': '5-string banjo',
+  'inst.erhu': 'Erhu',
+  'inst.pipa': 'Pipa',
+  temperament: 'Temperament',
+  root: 'Root',
+  'temp.equal': 'Equal temperament',
+  'temp.just': 'Just intonation',
+  'temp.pythagorean': 'Pythagorean',
+  'temp.meantone': 'Quarter-comma meantone',
+  'temp.werckmeister3': 'Werckmeister III',
+  'temp.kirnberger3': 'Kirnberger III',
+  'temp.vallotti': 'Vallotti',
+  transposition: 'Transpose',
+  'trans.0': 'C (concert pitch)',
+  'trans.2': 'B♭ instruments: trumpet, clarinet, soprano sax',
+  'trans.3': 'A instruments: A clarinet',
+  'trans.7': 'F instruments: horn',
+  'trans.9': 'E♭ instruments: alto sax',
+  naming: 'Note names',
+  'naming.letter': 'Letters C D E',
+  'naming.solfege': 'Fixed-do solfège Do Re Mi',
+  accidentals: 'Accidentals',
+  'acc.mixed': 'Usual: C♯ E♭ F♯ A♭ B♭',
+  'acc.sharp': 'Sharps only',
+  'acc.flat': 'Flats only',
+  tolerance: 'In-tune range',
+  toleranceValue: '±{n} cents',
+  sensitivity: 'Sensitivity',
+  sensitivityValue: '{n}%, gate at {db} dB',
+  levelLamp: 'Lit while the microphone hears you',
+  toneVoice: 'Tone voice',
+  'voice.reed': 'Reed',
+  'voice.sine': 'Sine',
+  toneVolume: 'Volume',
+  shortcutsLabel: 'Shortcuts:',
+  shortcutListen: 'Space start/stop',
+  shortcutNote: '←→ note or string (Esc automatic)',
+  shortcutA4: '↑↓ reference (Shift ±0.1)',
+  shortcutTone: 'R tone',
+  shortcutCalibrate: 'C calibrate',
+  sharpName: '{step} sharp ',
+  flatName: '{step} flat ',
+  noteSpoken: '{name}{octave}',
+  statusListening: 'Listening',
+  statusStopped: 'Stopped listening',
+  statusInTune: '{note} in tune',
+  statusFlat: '{note}, {cents} cents flat',
+  statusSharp: '{note}, {cents} cents sharp',
+  statusTone: 'Reference tone {note}',
+  updateAvailable: 'A new version is available',
+  reload: 'Reload',
+  offlineReady: 'Ready to work offline',
+  dismiss: 'Dismiss',
+  undo: 'Undo',
+  micDenied: 'The tuner needs the microphone. Allow it in the address bar or system settings.',
+  micMissing: 'No microphone found.',
+  micBusy: 'Another app is using the microphone.',
+  micInsecure: 'The microphone only works on an HTTPS address.',
+  micUnsupported: 'This browser can’t analyse live audio.',
+  micFailed: 'Could not open the microphone. Please try again.',
+  micEnded: 'The microphone went away, so listening stopped.',
+  audioInterrupted: 'Audio was interrupted, so listening stopped.',
+  processingOn:
+    'The browser is still processing the microphone (noise or level control); accuracy may suffer a little.',
+  calibrated: 'Reference set to A4 = {hz} Hz',
+  calibrateFailed: 'No steady A heard; the reference is unchanged.',
+}
+
+export const LANGUAGES = ['zh-Hant', 'en'] as const
+export type Language = (typeof LANGUAGES)[number]
+
+const MESSAGES: Record<Language, Record<MessageKey, string>> = { 'zh-Hant': zh, en }
+
+/** The browser's first preference decides: any Chinese locale gets Traditional Chinese. */
+export function detectLanguage(preferred: readonly string[]): Language {
+  return (preferred[0] ?? '').toLowerCase().startsWith('zh') ? 'zh-Hant' : 'en'
+}
+
+export function resolveLanguage(preference: LanguagePreference): Language {
+  if (preference !== 'auto') return preference
+  return detectLanguage(navigator.languages?.length ? navigator.languages : [navigator.language ?? ''])
+}
+
+let current: Language = resolveLanguage('auto')
+let messages: Record<MessageKey, string> = MESSAGES[current]
+
+export function setLanguage(language: Language): void {
+  current = language
+  messages = MESSAGES[language]
+}
+
+export function currentLanguage(): Language {
+  return current
+}
+
+export function t(key: MessageKey, vars: Record<string, string | number> = {}): string {
+  return messages[key].replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? `{${name}}`))
+}
+
+/**
+ * Fill static markup: `data-i18n` sets the text, `data-i18n-label` the aria-label and
+ * `data-i18n-title` the tooltip.
+ */
+export function translatePage(root: ParentNode = document): void {
+  document.documentElement.lang = current
+  document.title = current === 'zh-Hant' ? `${t('appTitle')} Tuner` : t('appTitle')
+  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n]')) {
+    el.textContent = t(el.dataset.i18n as MessageKey)
+  }
+  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n-label]')) {
+    el.setAttribute('aria-label', t(el.dataset.i18nLabel as MessageKey))
+  }
+  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n-title]')) {
+    el.title = t(el.dataset.i18nTitle as MessageKey)
+  }
+}

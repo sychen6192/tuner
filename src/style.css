@@ -1,0 +1,1399 @@
+/* The metronome's twin on the same music-room board: icon-navy slate (dark) or a textbook page
+   (light), chalk-white strokes, one yellow for the pen point, the locked target and Start. The
+   tuner draws pitch the way a pen plotter draws a line: a straight fall is in tune. */
+
+@font-face {
+  font-family: 'Tuner Engraved';
+  src: url('./fonts/tuner-engraved.woff2') format('woff2');
+  font-display: block;
+  unicode-range: U+266D-266F, U+E260-E262;
+}
+
+@font-face {
+  font-family: 'Old Standard TT';
+  font-weight: 700;
+  src: url('./fonts/old-standard-tt-latin-700-normal.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* The Chinese app name in a Ming serif that matches the score face (three glyphs only). */
+@font-face {
+  font-family: 'Tuner Wordmark';
+  font-weight: 700;
+  src: url('./fonts/tuner-wordmark.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+5668, U+8ABF, U+97F3;
+}
+
+:root {
+  color-scheme: dark;
+  /* Slate: the icon's navy owns the surface. */
+  --ground: #172036;
+  --ground-2: #1d2742;
+  --ground-3: #111a2d;
+  --ink: #eceff6;
+  --ink-2: #b4bdd2;
+  --ink-3: #8792ad;
+  --rule: #33405f;
+  --path: rgb(236 239 246 / 0.6);
+  --zone: rgb(236 239 246 / 0.07);
+  --yellow: #fccf3f;
+  --on-yellow: #172036;
+  /* Edge of yellow shapes: none needed on slate, ink on paper (yellow alone is 1.4:1 there). */
+  --yellow-edge: var(--yellow);
+  --thumb-edge: var(--ground);
+  --pen: var(--yellow);
+  --pen-ring: var(--ground);
+  --focus: var(--yellow);
+
+  --sans: system-ui, -apple-system, 'Segoe UI', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  --score: 'Tuner Engraved', 'Old Standard TT', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --wordmark: 'Old Standard TT', 'Tuner Wordmark', var(--score);
+
+  font-family: var(--sans);
+  font-size: 100%;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Textbook page: navy ink on cool paper, yellow as a highlighter fill only. */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --ground: #f3f5f9;
+    --ground-2: #e7ebf3;
+    --ground-3: #d9dfeb;
+    --ink: #172036;
+    --ink-2: #44506c;
+    --ink-3: #56617c;
+    --rule: #c6cddc;
+    --path: rgb(23 32 54 / 0.6);
+    --zone: rgb(23 32 54 / 0.07);
+    --yellow: #fccf3f;
+    --on-yellow: #172036;
+    --yellow-edge: #172036;
+    --thumb-edge: #172036;
+    --pen: #172036;
+    --pen-ring: var(--yellow);
+    --focus: #172036;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background: var(--ground);
+  scrollbar-color: var(--rule) transparent;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  background: var(--ground);
+  color: var(--ink);
+  caret-color: var(--yellow);
+}
+
+::selection {
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  /* No double-tap zoom on the ± and string buttons on iOS. */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+svg {
+  display: block;
+}
+
+button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Engraved accidentals; plain # and b only when the engraved face is unavailable. */
+.acc {
+  font-family: 'Tuner Engraved', var(--score);
+  font-weight: 400;
+}
+
+.acc-plain,
+.no-engraved .acc {
+  display: none;
+}
+
+.no-engraved .acc-plain {
+  display: inline;
+}
+
+/* ---------------------------------------------------------------- frame */
+
+.app {
+  width: min(100%, 1080px);
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+
+/* Wraps only on the narrowest screens (e.g. a 280 px cover display with Install shown). */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 12px;
+  min-height: 60px;
+}
+
+/* The wordmark speaks in the score voice, like the note names. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--wordmark);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 20px;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.text-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.language {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+.language button {
+  min-width: 44px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.language button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+/* ---------------------------------------------------------------- stage */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+/* The note, set as a score sets it, between the ♭ and ♯ buttons that choose the target. */
+.note-mark {
+  --step: 52px;
+  justify-self: center;
+  width: min(100%, 440px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Instruments pick their target with the string buttons instead. */
+.note-mark.instrument .step {
+  visibility: hidden;
+}
+
+.note-block {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+/* The note disc: a ring while it listens, solid chalk once in tune (held, never flashed), yellow
+   when the target is locked by hand. */
+.note {
+  --size: clamp(120px, 34vw, 156px);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border: 2px solid var(--path);
+  border-radius: 50%;
+  background: var(--ground);
+  color: var(--ink);
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.note-name {
+  display: flex;
+  align-items: baseline;
+  font-family: var(--score);
+  font-weight: 700;
+  line-height: 1;
+  /* Optical centre: the octave figure hangs low on the right. */
+  translate: 0.06em 0.02em;
+  font-size: calc(var(--size) * 0.44);
+}
+
+.note-step {
+  letter-spacing: -0.01em;
+}
+
+/* Solfège syllables (Sol, Fa) are wider than letters. */
+.note-step.syllable {
+  font-size: 0.66em;
+}
+
+/* Set high beside the letter, as tuners and chord symbols set it. */
+.note-accidental {
+  font-size: 0.52em;
+  translate: 0.03em -0.62em;
+}
+
+.note-accidental:empty {
+  display: none;
+}
+
+.note-octave {
+  margin-left: 0.04em;
+  font-size: 0.4em;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-2);
+}
+
+.note[data-state='idle'],
+.note[data-state='waiting'] {
+  border-style: dashed;
+  border-color: var(--ink-3);
+  color: var(--ink-3);
+}
+
+.note[data-state='held'] {
+  color: var(--ink-2);
+}
+
+.note[data-state='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ground);
+  transition-duration: 0s;
+}
+
+.note[data-state='true'] .note-octave {
+  color: inherit;
+}
+
+.note.locked {
+  border-style: solid;
+  border-color: var(--yellow-edge);
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.note.locked .note-octave {
+  color: inherit;
+}
+
+.note.locked[data-state='true'] {
+  border-color: var(--yellow);
+  border-width: 4px;
+  background: var(--ink);
+  color: var(--ground);
+}
+
+/* The reference tone sounding: a yellow ring, the note the ear should match. */
+.note[data-state='tone'] {
+  border-width: 4px;
+  border-color: var(--yellow-edge);
+}
+
+.readout {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 0;
+  font-family: var(--score);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+
+.readout output {
+  display: inline-block;
+  text-align: right;
+}
+
+.readout-cents output {
+  min-width: 2.6ch;
+}
+
+/* The score face's + and − are math-width; at this size they match a figure. */
+.readout .sign {
+  display: inline-block;
+  min-width: 0.62em;
+  font-size: 0.72em;
+  text-align: right;
+  translate: 0 -0.08em;
+}
+
+.readout-hz output {
+  min-width: 4.4ch;
+}
+
+.readout .unit {
+  margin-left: 0.18em;
+  color: var(--ink-2);
+  font-size: 0.8em;
+}
+
+.step {
+  display: grid;
+  place-items: center;
+  width: var(--step, 52px);
+  height: var(--step, 52px);
+  border: 1.5px solid var(--rule);
+  border-radius: 50%;
+  color: var(--ink);
+  transition:
+    background-color 140ms ease-out,
+    scale 100ms ease-out;
+}
+
+.step.small {
+  width: 44px;
+  height: 44px;
+}
+
+.step:active:not(:disabled) {
+  scale: 0.94;
+  background: var(--ground-2);
+}
+
+.step-glyph {
+  font-family: var(--score);
+  font-size: 1.75rem;
+  line-height: 1;
+  translate: 0 0.06em;
+}
+
+.no-engraved .step-glyph {
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- the chart */
+
+.chart {
+  --pad: 14px;
+  justify-self: center;
+  width: min(100%, 560px);
+  margin: 0;
+}
+
+/* Three strobe bands (fundamental, octave, two octaves), aligned with the scale's ends. */
+.strobe {
+  display: grid;
+  gap: 3px;
+  margin: 2px var(--pad) 4px;
+}
+
+.band {
+  --offset: 0px;
+  --alpha: 0;
+  height: 6px;
+  border-radius: 1px;
+  background: repeating-linear-gradient(to right, var(--path) 0 9px, transparent 9px 18px);
+  background-position-x: var(--offset);
+  opacity: max(var(--alpha), 0.16);
+}
+
+.scale {
+  display: block;
+  overflow: visible;
+}
+
+.scale-base {
+  stroke: var(--rule);
+  stroke-width: 1px;
+}
+
+.tick {
+  stroke: var(--ink-3);
+  stroke-width: 1px;
+}
+
+.tick.major {
+  stroke: var(--ink-2);
+  stroke-width: 1.5px;
+}
+
+.scale-figure {
+  fill: var(--ink-2);
+  font-family: var(--score);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: lining-nums;
+}
+
+.scale-figure-sign {
+  font-size: 9px;
+}
+
+.scale-sign {
+  fill: var(--ink-2);
+  font-family: 'Tuner Engraved', var(--score);
+  font-size: 20px;
+  translate: 0 3px;
+}
+
+.no-engraved .scale-figure-sign {
+  font-size: 9px;
+}
+
+.scale-sign {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scale-zone {
+  fill: var(--zone);
+}
+
+/* The 0 mark is printed like the metronome's ictus bars, and grows taller when in tune. */
+.scale-zero {
+  stroke: var(--ink);
+  stroke-width: 3px;
+  stroke-linecap: round;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transition: transform 160ms ease-out;
+}
+
+.scale-zero.active {
+  transform: scaleY(1.7);
+}
+
+.pen circle {
+  fill: var(--pen);
+  stroke: var(--pen-ring);
+  stroke-width: 3px;
+  paint-order: stroke;
+}
+
+.pen[data-state='idle'] circle,
+.pen[data-state='waiting'] circle {
+  fill: var(--ground);
+  stroke: var(--ink-3);
+  stroke-width: 1.5px;
+}
+
+.pen[data-state='held'] circle {
+  opacity: 0.55;
+}
+
+/* Off the scale: the point sits at the end, hollow. */
+.pen[data-beyond] circle {
+  fill: var(--ground);
+  stroke: var(--yellow-edge);
+  stroke-width: 3px;
+}
+
+/* The paper: as tall as the screen allows with the controls still in the first viewport. */
+.trace-wrap {
+  position: relative;
+  height: clamp(132px, calc(100svh - 610px), 340px);
+}
+
+.stage:has(.strings-row:not([hidden])) .trace-wrap {
+  height: clamp(120px, calc(100svh - 680px), 320px);
+}
+
+.trace {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Colours the canvas reads, so the trace follows the theme and Windows Contrast themes. */
+.trace-swatches {
+  display: none;
+}
+
+.swatch-line {
+  color: var(--ink-2);
+}
+
+.swatch-true {
+  color: var(--ink);
+}
+
+.swatch-zone {
+  color: var(--zone);
+}
+
+.swatch-rule {
+  color: var(--rule);
+}
+
+.swatch-label {
+  color: var(--ink-3);
+}
+
+/* Captioned as a textbook captions its figure: the time span, then how to read it. */
+.caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0 0;
+}
+
+.caption-time {
+  flex: none;
+  color: var(--ink-2);
+  font-family: var(--score);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.hint {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  text-wrap: balance;
+}
+
+/* ---------------------------------------------------------------- strings */
+
+.strings {
+  --count: 6;
+  display: grid;
+  grid-template-columns: repeat(var(--count), 44px);
+  justify-content: center;
+  gap: clamp(6px, 3vw, 18px);
+}
+
+/* String numerals are the target buttons: ring = listening for it, yellow = locked, chalk = in tune. */
+.string {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--path);
+  border-radius: 50%;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--score);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+}
+
+.string-name {
+  display: flex;
+  align-items: baseline;
+  translate: 0.04em 0;
+}
+
+.string .octave {
+  font-size: 0.62em;
+  color: var(--ink-2);
+}
+
+.string .acc {
+  font-size: 0.86em;
+}
+
+.string.current {
+  border-color: var(--ink);
+}
+
+.string[aria-pressed='true'] {
+  border-color: var(--yellow-edge);
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.string.in-tune {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ground);
+  transition-duration: 0s;
+}
+
+.string.in-tune[aria-pressed='true'] {
+  border-color: var(--yellow);
+}
+
+.string[aria-pressed='true'] .octave,
+.string.in-tune .octave {
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- transport */
+
+.transport {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(6px, 2.4vw, 12px);
+  margin-top: 4px;
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: min(148px, 32vw);
+  height: 64px;
+  padding: 0 clamp(16px, 5vw, 28px);
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+  font-size: 1.125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
+  transition:
+    scale 100ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.primary svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.primary:active {
+  scale: 0.97;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}
+
+.primary .icon-stop,
+.primary.playing .icon-play {
+  display: none;
+}
+
+.primary.playing .icon-stop {
+  display: block;
+}
+
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: min(92px, 24vw);
+  height: 52px;
+  padding: 0 clamp(8px, 3vw, 14px);
+  border: 1.5px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    scale 100ms ease-out;
+}
+
+.secondary svg {
+  width: 20px;
+  height: 20px;
+}
+
+.secondary:active {
+  scale: 0.97;
+}
+
+#calibrate {
+  justify-self: end;
+}
+
+#tone {
+  justify-self: start;
+}
+
+#tone[aria-pressed='true'],
+#calibrate.active {
+  border-color: var(--yellow-edge);
+  background: color-mix(in srgb, var(--yellow) 18%, var(--ground));
+}
+
+/* ---------------------------------------------------------------- settings: the figure's legend */
+
+.settings {
+  display: grid;
+  margin: 0 -16px;
+  padding: 8px 16px 0;
+  background: var(--ground-2);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 6.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.label {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* The reference pitch, written as a score writes it: A4 = 440 Hz. */
+.reference {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 2vw, 14px);
+}
+
+.reference-mark {
+  display: flex;
+  align-items: baseline;
+  gap: 0.22em;
+  min-width: 6.4em;
+  justify-content: center;
+  font-family: var(--score);
+  font-size: clamp(1.25rem, 5.6vw, 1.625rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.reference-octave {
+  font-size: 0.55em;
+  color: var(--ink-2);
+}
+
+.reference-equals {
+  font-size: 0.7em;
+  translate: 0 -0.08em;
+}
+
+.reference .unit {
+  color: var(--ink-2);
+  font-size: 0.6em;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5rem;
+  gap: 8px;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.segmented.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segmented.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segment {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 48px;
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segment-text {
+  pointer-events: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Note names in the segments speak in the score voice. */
+.segment-text:has(.step-name) {
+  font-family: var(--score);
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.segment-text .acc {
+  font-size: 0.92em;
+}
+
+.segment:has(input:checked) {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ground);
+}
+
+.segment:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 40px 0 14px;
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--ink-2) 50%) right 20px center / 6px 6px no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--ink-2) 50%) right 14px center / 6px 6px no-repeat,
+    var(--ground);
+  text-overflow: ellipsis;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.select.root {
+  padding-right: 34px;
+  font-family: var(--score);
+  font-weight: 700;
+}
+
+.select:disabled {
+  opacity: 0.38;
+}
+
+/* ---------------------------------------------------------------- sliders */
+
+.slider {
+  --p: 0.5;
+  --thumb-w: 22px;
+  --thumb-h: 22px;
+  width: 100%;
+  height: 40px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* Horizontal drags move the slider, vertical swipes still scroll the page. */
+  touch-action: pan-y;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.slider:focus-visible {
+  outline: none;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--ink) calc(var(--thumb-w) / 2 + (100% - var(--thumb-w)) * var(--p)),
+    var(--rule) 0
+  );
+}
+
+.slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--ink) calc(var(--thumb-w) / 2 + (100% - var(--thumb-w)) * var(--p)),
+    var(--rule) 0
+  );
+}
+
+.slider::-webkit-slider-thumb {
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  margin-top: calc((4px - var(--thumb-h)) / 2);
+  border: 3px solid var(--ground);
+  border-radius: 50%;
+  background: var(--ink);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.slider::-moz-range-thumb {
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  border: 3px solid var(--ground);
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.slider:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Sensitivity, with a signal lamp: lit while the microphone hears something above the gate. */
+.level {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.level-lamp {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink-3);
+  border-radius: 50%;
+}
+
+.level-lamp.heard {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+/* Each shortcut stays on one line; lines break between them. */
+.shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 18px 0 8px;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+/* A full-width colon carries its own space; the English one needs a gap. */
+.shortcuts-label:lang(en) {
+  margin-inline-end: 0.5em;
+}
+
+.shortcut {
+  white-space: nowrap;
+}
+
+.shortcut:not(:last-child)::after {
+  content: '·';
+  content: '·' / '';
+  margin-inline: 0.5em;
+}
+
+/* Keyboard shortcuts are irrelevant on touch-only devices. */
+@media (hover: none) and (pointer: coarse) {
+  .shortcuts {
+    display: none;
+  }
+}
+
+@media (hover: hover) {
+  .step:hover:not(:disabled),
+  .secondary:hover,
+  .segment:hover,
+  .text-button:hover {
+    background: var(--ground-2);
+  }
+
+  .settings .step:hover:not(:disabled),
+  .settings .segment:hover:not(:has(input:checked)) {
+    background: var(--ground-3);
+  }
+
+  .string:hover,
+  .note:hover {
+    border-color: var(--ink);
+  }
+}
+
+/* ---------------------------------------------------------------- toast */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--ground);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.3);
+  font-size: 0.9375rem;
+  transform: translateX(-50%);
+}
+
+.toast-action {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+  font-weight: 700;
+}
+
+.toast-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--ground);
+}
+
+.toast-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.toast :focus-visible {
+  outline-color: var(--ground);
+}
+
+/* ---------------------------------------------------------------- sizes */
+
+@media (max-width: 360px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .note-mark {
+    --step: 46px;
+  }
+}
+
+/* Narrow phones: Calibrate and Tone set their label under the icon, at Start's height. */
+@media (max-width: 380px) {
+  .secondary {
+    flex-direction: column;
+    gap: 2px;
+    height: 64px;
+    padding: 0 10px;
+    border-radius: 20px;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Narrow screens: the install button keeps its icon; its label stays for screen readers. */
+@media (max-width: 400px) {
+  .text-button {
+    justify-content: center;
+    min-width: 44px;
+  }
+
+  .text-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Wide screens: the tuning area keeps the first screen; the settings sit below it as a
+   two-column legend. */
+@media (min-width: 900px) {
+  .app {
+    padding-inline: 32px;
+  }
+
+  .stage {
+    width: min(100%, 760px);
+    margin-inline: auto;
+  }
+
+  .settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 48px;
+    margin: 0;
+    padding: 8px 32px 12px;
+    border-radius: 20px;
+  }
+
+  .settings > .shortcuts {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+
+  /* The strobe is motion by nature; the pen and the figures carry the same reading. */
+  .strobe {
+    display: none;
+  }
+
+  .scale-zero.active {
+    transform: none;
+    stroke-width: 4px;
+  }
+}
+
+/* Windows Contrast themes: backgrounds turn to Canvas and shadows vanish, so every state gets a
+   border or a system-colour fill. Selected/active states are fills, never outlines, so they
+   cannot be mistaken for the focus ring. Vendor pseudo-elements stay in separate rules. */
+@media (forced-colors: active) {
+  .band {
+    forced-color-adjust: none;
+    background: repeating-linear-gradient(to right, CanvasText 0 9px, transparent 9px 18px);
+    background-position-x: var(--offset);
+  }
+
+  .tick,
+  .tick.major,
+  .scale-zero,
+  .scale-base {
+    stroke: CanvasText;
+  }
+
+  .scale-figure,
+  .scale-figure-sign {
+  font-size: 9px;
+}
+
+.scale-sign {
+    fill: CanvasText;
+  }
+
+  .scale-zone {
+    fill: transparent;
+  }
+
+  .pen circle {
+    forced-color-adjust: none;
+    fill: Highlight;
+    stroke: Canvas;
+  }
+
+  .swatch-line {
+    color: CanvasText;
+  }
+
+  .swatch-true {
+    color: Highlight;
+  }
+
+  .swatch-zone {
+    color: transparent;
+  }
+
+  .swatch-rule,
+  .swatch-label {
+    color: GrayText;
+  }
+
+  .note,
+  .string {
+    border-color: CanvasText;
+  }
+
+  .note.locked,
+  .string[aria-pressed='true'] {
+    forced-color-adjust: none;
+    border-color: CanvasText;
+    background: CanvasText;
+    color: Canvas;
+  }
+
+  .note[data-state='true'],
+  .note.locked[data-state='true'],
+  .string.in-tune {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .step,
+  .secondary,
+  .segment,
+  .select,
+  .language {
+    border-color: ButtonText;
+  }
+
+  .primary {
+    border: 2px solid ButtonText;
+    box-shadow: none;
+  }
+
+  .segment:has(input:checked),
+  #tone[aria-pressed='true'],
+  #calibrate.active,
+  .language button[aria-pressed='true'] {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .level-lamp {
+    border-color: CanvasText;
+  }
+
+  .level-lamp.heard {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+  }
+
+  .slider::-webkit-slider-runnable-track {
+    border: 1px solid CanvasText;
+  }
+
+  .slider::-moz-range-track {
+    border: 1px solid CanvasText;
+  }
+
+  .slider::-webkit-slider-thumb {
+    forced-color-adjust: none;
+    border-color: ButtonFace;
+    background: ButtonText;
+  }
+
+  .slider::-moz-range-thumb {
+    forced-color-adjust: none;
+    border-color: ButtonFace;
+    background: ButtonText;
+  }
+
+  .slider:focus-visible::-webkit-slider-thumb {
+    outline-color: Highlight;
+  }
+
+  .slider:focus-visible::-moz-range-thumb {
+    outline-color: Highlight;
+  }
+
+  :focus-visible,
+  .segment:has(input:focus-visible) {
+    outline-color: CanvasText;
+  }
+}
