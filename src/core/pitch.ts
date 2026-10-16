@@ -54,6 +54,11 @@ const OCTAVE_MARGIN = 0.035
  * belongs to T (or every upward octave leap would read an octave low).
  */
 const HINT_MARGIN = 0.003
+/**
+ * Below this many samples per period the interpolated peak heights are too coarse for
+ * HINT_MARGIN to decide between T and 2T, so the hint does not pull a high note down an octave.
+ */
+const HINT_MIN_LAG = 40
 /** Headroom above the highest frequency searched, so a sharp top note keeps its octave. */
 const MAX_HEADROOM = 2 ** (100 / 1200)
 /** Repeats used for refinement must stay this periodic (relative to the period's own peak). */
@@ -186,9 +191,12 @@ export class PitchDetector {
     const keyMaxima = this.keyMaxima(n)
     if (keyMaxima.length === 0) return null
 
+    // Compare interpolated heights: at short lags the integer samples straddle the true peak
+    // unevenly, enough to tip the choice to a multiple of the period.
+    const height = (lag: number) => interpolate(n, lag).value
     let tallest = 0
-    for (const lag of keyMaxima) tallest = Math.max(tallest, n[lag]!)
-    const chosen = keyMaxima.find((lag) => n[lag]! >= this.threshold * tallest)!
+    for (const lag of keyMaxima) tallest = Math.max(tallest, height(lag))
+    const chosen = keyMaxima.find((lag) => height(lag) >= this.threshold * tallest)!
     // Above the range: no reading, rather than a confident one an octave or a twelfth low.
     if (chosen < this.minLag) return null
     let period = interpolate(n, chosen)
@@ -254,7 +262,7 @@ export class PitchDetector {
    */
   private followHint(period: Peak, hint: number): Peak {
     const cents = 1200 * Math.log2(this.sampleRate / period.lag / hint)
-    if (Math.abs(cents - 1200) < 60) {
+    if (Math.abs(cents - 1200) < 60 && period.lag >= HINT_MIN_LAG) {
       const longer = this.base.peakNear(2 * period.lag)
       if (longer && longer.value >= 0.8 && longer.value > period.value + HINT_MARGIN) return longer
     } else if (Math.abs(cents + 1200) < 60 && period.lag / 2 >= this.minLag) {

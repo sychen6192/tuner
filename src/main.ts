@@ -247,10 +247,13 @@ function onListenEnd(reason: ListenEnd): void {
   const message: Record<ListenEnd, MessageKey> = {
     device: 'micEnded',
     interrupted: 'audioInterrupted',
-    failed: 'analysisFailed',
+    failed: 'loadFailed',
   }
-  showToast(message[reason], undefined, undefined, true)
+  showToast(message[reason], reason === 'failed' ? RELOAD : undefined, undefined, true)
 }
+
+/** A toast action that reloads the page (a file of this version failed to load). */
+const RELOAD = { label: 'reload', run: () => window.location.reload() } as const
 
 /** The system stopped the reference tone (a call, Siri): say so and settle the screen. */
 function onToneEnd(): void {
@@ -435,6 +438,11 @@ function render(): void {
   )
   setSlider(els.volume, Math.round(settings.toneVolume * 100))
   els.letterShortcuts.checked = settings.letterShortcuts
+  // Shortcut hints only for the keys that work.
+  const letters = settings.letterShortcuts
+  for (const hint of document.querySelectorAll<HTMLElement>('.letter-shortcut')) hint.hidden = !letters
+  els.calibrate.title = t('calibrateTitle') + (letters ? ' (C)' : '')
+  els.tone.title = t('toneTitle') + (letters ? ' (R)' : '')
 
   // The ♭/♯ buttons pick a note in chromatic mode; strings have their own buttons.
   els.noteMark.classList.toggle('instrument', isInstrument())
@@ -483,10 +491,14 @@ let pendingStart: Promise<boolean> | null = null
  * (resuming on return to the app, where it may need a tap).
  */
 function startListening(quiet = false): Promise<boolean> {
-  if (pendingStart) return pendingStart
+  // Share a start only while it is still current: one stopped meanwhile is not the user's wish.
+  if (pendingStart && engine.listening) return pendingStart
   if (engine.listening) return Promise.resolve(true)
-  pendingStart = beginListening(quiet).finally(() => (pendingStart = null))
-  return pendingStart
+  const start: Promise<boolean> = beginListening(quiet).finally(() => {
+    if (pendingStart === start) pendingStart = null
+  })
+  pendingStart = start
+  return start
 }
 
 async function beginListening(quiet: boolean): Promise<boolean> {
@@ -514,8 +526,9 @@ async function beginListening(quiet: boolean): Promise<boolean> {
       insecure: 'micInsecure',
       unsupported: 'micUnsupported',
       failed: 'micFailed',
+      reload: 'loadFailed',
     }
-    showToast(message[reason], undefined, undefined, true)
+    showToast(message[reason], reason === 'reload' ? RELOAD : undefined, undefined, true)
     return false
   }
   // Superseded: stopped (or restarted) while the microphone was opening.
@@ -526,6 +539,7 @@ async function beginListening(quiet: boolean): Promise<boolean> {
   for (const message of LISTEN_PROBLEMS) dismissToast(message)
   void wakeLock.request()
   if (engine.forcedProcessing.length > 0) showToast('processingOn', undefined, undefined, true)
+  else dismissToast('processingOn')
   els.status.textContent = t('statusListening')
   renderTransport()
   requestFrame()
@@ -542,7 +556,7 @@ const LISTEN_PROBLEMS: readonly MessageKey[] = [
   'micFailed',
   'micEnded',
   'audioInterrupted',
-  'analysisFailed',
+  'loadFailed',
 ]
 
 function stopListening(): void {
@@ -555,6 +569,7 @@ function stopListening(): void {
 /** Listening ended (by the user or not): settle the screen, and hold the paper still. */
 function afterStop(): void {
   cancelCalibration()
+  dismissToast('processingOn')
   pausedAt = performance.now() / 1000
   tracker.reset()
   tuner = tracker.current
@@ -569,7 +584,10 @@ async function toggleListening(): Promise<void> {
 
 /** The note the tone sounds: the locked target, else what was just heard, else A4. */
 function toneTarget(): number {
-  return lockedMidi() ?? tuner.midi ?? lastMidi ?? 69
+  const midi = lockedMidi() ?? tuner.midi ?? lastMidi ?? 69
+  // An instrument's tone sounds one of its strings, so the note disc can lock it.
+  if (!isInstrument() || strings().includes(midi)) return midi
+  return strings().reduce((best, string) => (Math.abs(string - midi) < Math.abs(best - midi) ? string : best))
 }
 
 function toggleTone(): void {
@@ -580,6 +598,7 @@ function toggleTone(): void {
   }
   const midi = toneTarget()
   if (engine.listening) stopListening()
+  dismissToast('toneInterrupted')
   toneMidi = midi
   void engine.tone.play(frequencyOf(midi), settings.toneVoice, settings.toneVolume)
   void wakeLock.request()
@@ -663,6 +682,8 @@ async function toggleCalibration(): Promise<void> {
   }
   const token = {}
   calibrationPending = token
+  dismissToast('calibrateFailed')
+  dismissToast('calibrated')
   renderTransport()
   const listening = await startListening()
   if (calibrationPending !== token) return // cancelled while the microphone was opening
@@ -891,7 +912,7 @@ function bindEvents(): void {
 
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('keyup', (event) => {
-    if (event.code === 'Space' && !isTextEntry(event.target)) event.preventDefault()
+    if (event.code === 'Space' && !ownsSpace(event.target)) event.preventDefault()
   })
 
   // The microphone is private: release it while the app is hidden, and pick up again on return.
@@ -915,11 +936,16 @@ function isTextEntry(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.matches('input[type="number"], input[type="text"], select, textarea')
 }
 
+/** Space belongs to a focused checkbox (it toggles it), not to the listen shortcut. */
+function ownsSpace(target: EventTarget | null): boolean {
+  return isTextEntry(target) || (target instanceof HTMLElement && target.matches('input[type="checkbox"]'))
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   if (event.ctrlKey || event.metaKey || event.altKey) return
   const target = event.target
   if (event.code === 'Space') {
-    if (isTextEntry(target)) return
+    if (ownsSpace(target)) return
     event.preventDefault()
     if (!event.repeat) void toggleListening()
     return

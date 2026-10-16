@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { Analyser, type Reading } from '../src/core/analyser'
-import { cents } from './support/signals'
+import { cents, random } from './support/signals'
 
 const SR = 48000
 const HOP = 512
 
 /** A continuous phase-coherent tone whose frequency (and spectrum) can change over time. */
-function stream(segments: { seconds: number; frequency: number; harmonics?: number[] }[]) {
+function stream(segments: { seconds: number; frequency: number; harmonics?: number[] }[], noise = 0) {
   const total = Math.round(segments.reduce((s, x) => s + x.seconds, 0) * SR)
   const out = new Float32Array(total)
+  const rand = random(9)
   let i = 0
   let phase = 0
   for (const segment of segments) {
@@ -19,7 +20,7 @@ function stream(segments: { seconds: number; frequency: number; harmonics?: numb
       phase += (2 * Math.PI * segment.frequency) / SR
       let v = 0
       harmonics.forEach((a, h) => (v += a * Math.sin((h + 1) * phase + h)))
-      out[i] = (0.4 * v) / norm
+      out[i] = (0.4 * v) / norm + noise * (rand() * 2 - 1)
     }
   }
   return out
@@ -54,6 +55,42 @@ describe('Analyser', () => {
       const after = readings.filter((r) => r.time > 1.25 && r.frequency !== null)
       expect(after.length, `${low} Hz`).toBeGreaterThan(50)
       for (const r of after) expect(Math.abs(cents(r.frequency!, 2 * low)), `${low} Hz at ${r.time}`).toBeLessThan(5)
+    }
+  })
+
+  it('follows an upward octave leap high up, where the hint stands aside', () => {
+    const analyser = new Analyser(SR)
+    const readings = run(
+      analyser,
+      stream(
+        [
+          { seconds: 1, frequency: 1174.7, harmonics: [1, 0.6, 0.4, 0.3] },
+          { seconds: 1, frequency: 2349.3, harmonics: [1, 0.6, 0.4, 0.3] },
+        ],
+        0.005,
+      ),
+    )
+    const after = readings.filter((r) => r.time > 1.15 && r.frequency !== null)
+    for (const r of after) expect(Math.abs(cents(r.frequency!, 2349.3)), `at ${r.time}`).toBeLessThan(5)
+  })
+
+  it('holds a low string in its octave while its fundamental fades', () => {
+    // Bright attack, then a held tone that is nearly all 2nd harmonic: the case the hint is for.
+    for (const low of [110, 41.2, 220]) {
+      const analyser = new Analyser(SR)
+      const readings = run(
+        analyser,
+        stream(
+          [
+            { seconds: 0.4, frequency: low, harmonics: [0.6, 1, 0.5, 0.3] },
+            { seconds: 2, frequency: low, harmonics: [0.05, 1, 0.04, 0.3] },
+          ],
+          0.01,
+        ),
+      )
+      const held = readings.filter((r) => r.time > 0.5 && r.frequency !== null)
+      expect(held.length).toBeGreaterThan(100)
+      for (const r of held) expect(Math.abs(cents(r.frequency!, low)), `${low} Hz at ${r.time}`).toBeLessThan(50)
     }
   })
 

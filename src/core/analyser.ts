@@ -6,8 +6,11 @@ import { strobeBands, type StrobeBand } from './strobe'
  * The analysis loop the worker runs, kept free of worker APIs so it can be tested: it keeps the
  * last few hundred milliseconds of signal, and for each hop runs the detector and the strobe.
  *
- * - The octave hint comes only from readings the detector made on its own. A reading that the
- *   hint decided cannot renew it, so a wrong octave can never keep itself alive.
+ * - The octave hint is renewed by readings the detector made on its own, and, for low notes
+ *   only, by readings the hint decided. A held low string whose fundamental fades depends on
+ *   the hint for as long as it rings; there the detector's tie-break between T and 2T is
+ *   reliable, so a real octave leap still gets through. Higher up it is not, and a reading the
+ *   hint decided must not keep a wrong octave alive.
  * - When detection is slower than real time (a slow phone, the long window of a bass string),
  *   hops are taken in without analysis until the time is paid back, so readings stay current
  *   instead of queueing up behind the instrument.
@@ -30,6 +33,8 @@ export interface Reading {
 const HINT_CLARITY = 0.9
 /** How long a hint stays valid, seconds. */
 const HINT_TIME = 0.3
+/** Readings the hint decided renew it only below this frequency, as samples per period. */
+const HINT_RENEW_PERIOD = 80
 /** Clarity needed before the strobe is measured. */
 const STROBE_CLARITY = 0.8
 
@@ -102,7 +107,8 @@ export class Analyser {
     if (this.hint && time - this.hint.time > HINT_TIME) this.hint = null
     const level = levelDb(history, this.detector.windowSize)
     const estimate = this.detector.detect(history, this.hint?.frequency)
-    if (estimate && estimate.clarity >= HINT_CLARITY && !estimate.fromHint) {
+    const renews = estimate && (!estimate.fromHint || estimate.frequency < this.sampleRate / HINT_RENEW_PERIOD)
+    if (estimate && renews && estimate.clarity >= HINT_CLARITY) {
       this.hint = { frequency: estimate.frequency, time }
     }
     const target = this.target

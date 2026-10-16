@@ -56,4 +56,4 @@ Accuracy figures come from the repository's own tests on synthetic signals (`npm
 
 ## Accessibility & Inclusion
 
-Keyboard operable and screen-reader labelled, with spoken readings ("A4, 3 cents sharp") through a polite live region; WCAG AA contrast in both themes; respects reduced motion (the strobe, which is motion by nature, is hidden; the pen and figures carry the same reading) and Windows contrast themes; 44 px or larger touch targets (a seven-string row on a 320 px screen shrinks to about 36 px rather than overflow).
+Keyboard operable and screen-reader labelled, with spoken readings ("A4, 3 cents sharp") through a polite live region; WCAG AA contrast in both themes; respects reduced motion (the strobe, which is motion by nature, is hidden; the pen and figures carry the same reading) and Windows contrast themes; 44 px or larger touch targets (except a seven-string row below about 350 px wide, which shrinks to about 36 px at 320 px rather than overflow).

@@ -81,7 +81,7 @@
           </div>
 
           <div class="transport">
-            <button id="calibrate" class="secondary" type="button" data-i18n-title="calibrateTitle">
+            <button id="calibrate" class="secondary" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5v7.2a3 3 0 0 0 6 0V3.5M12 13.7V20.5" /><path d="M4.5 8.5a6 6 0 0 0 0 5M19.5 8.5a6 6 0 0 1 0 5" /></svg>
               <span id="calibrate-label" data-i18n="calibrate">校準</span>
             </button>
@@ -90,7 +90,7 @@
               <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.2" y="6.2" width="11.6" height="11.6" rx="1.6" /></svg>
               <span id="listen-label" data-i18n="listen">開始</span>
             </button>
-            <button id="tone" class="secondary" type="button" aria-pressed="false" data-i18n-title="toneTitle">
+            <button id="tone" class="secondary" type="button" aria-pressed="false">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h3.5L12 18V6L7.5 10zM15.5 9a4 4 0 0 1 0 6M18.2 6.3a7.8 7.8 0 0 1 0 11.4" /></svg>
               <span data-i18n="tone">參考音</span>
             </button>
@@ -106,7 +106,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg>
               </button>
               <span class="reference-mark" aria-hidden="true">
-                <span class="reference-note">A<span class="reference-octave">4</span></span><span class="reference-equals">=</span><span id="a4-value" class="reference-value">440</span><span class="unit">Hz</span>
+                <span class="reference-figures"><span class="reference-note">A<span class="reference-octave">4</span></span><span class="reference-equals">=</span><span id="a4-value" class="reference-value">440</span><span class="unit">Hz</span></span>
               </span>
               <output id="a4-output" class="sr-only" aria-live="polite">440 Hz</output>
               <button id="a4-up" class="step small" type="button" data-i18n-label="a4Up" aria-label="調高標準音">
@@ -171,8 +171,8 @@
             <span class="shortcut" data-i18n="shortcutListen">空白鍵 開始／停止</span>
             <span class="shortcut" data-i18n="shortcutNote">←→ 選音或選弦（Esc 自動）</span>
             <span class="shortcut" data-i18n="shortcutA4">↑↓ 標準音（Shift ±0.1）</span>
-            <span class="shortcut" data-i18n="shortcutTone">R 參考音</span>
-            <span class="shortcut" data-i18n="shortcutCalibrate">C 校準</span>
+            <span class="shortcut letter-shortcut" data-i18n="shortcutTone">R 參考音</span>
+            <span class="shortcut letter-shortcut" data-i18n="shortcutCalibrate">C 校準</span>
           </p>
           <label class="shortcut-switch">
             <input id="letter-shortcuts" type="checkbox" checked />

@@ -113,6 +113,17 @@ describe('PitchDetector', () => {
     const d4 = midiToHz(62) * 2 ** (40 / 1200)
     const harmonic = bass.detect(tone({ frequency: d4, length: bass.bufferSize, harmonics: [1, 0.3] }))
     expect(Math.abs(cents(harmonic!.frequency, d4))).toBeLessThan(1)
+    // A bright A7 is far above a violin: no reading or the right one, never an octave low.
+    const violinRange = searchRange(strings('violin'), 440)
+    const violin = new PitchDetector({
+      sampleRate: 48000,
+      minFrequency: violinRange.min,
+      maxFrequency: violinRange.max,
+    })
+    for (const f of [3100, 3520, 3800]) {
+      const r = violin.detect(tone({ frequency: f, length: violin.bufferSize, harmonics: [1, 0.6, 0.4, 0.3, 0.2] }))
+      expect(r === null || Math.abs(cents(r.frequency, f)) < 50, `${f} Hz read as ${r?.frequency}`).toBe(true)
+    }
     // G4 is far above a bass: no reading, rather than a confident one an octave low.
     const g4 = bass.detect(tone({ frequency: midiToHz(67), length: bass.bufferSize, harmonics: [1, 0.3] }))
     expect(g4).toBeNull()

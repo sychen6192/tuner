@@ -35,7 +35,7 @@ typography:
     fontFeature: "tnum, lnum"
   reference-mark:
     fontFamily: "'Old Standard TT', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif"
-    fontSize: "clamp(1.25rem, 5.6vw, 1.625rem)"
+    fontSize: "clamp(0.875rem, 19cqi, 1.625rem)"
     fontWeight: 700
     lineHeight: 1
     fontFeature: "tnum, lnum"
@@ -182,18 +182,18 @@ The metronome's palette, unchanged, plus one role: the in-tune zone.
 ### Hierarchy
 - **Display note** (score, 44% of the disc): the note letter; syllables at 66% of that. The accidental is set high at 0.52em beside the letter, the octave figure at 0.4em in soft ink on the baseline.
 - **Readout** (score 700, 1.25rem, tabular lining figures): cents and hertz beneath the disc. Signs are set at 0.72em because the face's + and − are math-width.
-- **Reference mark** (score 700, up to 1.625rem): "A4 = 440 Hz" in the legend, the twin of the metronome's tempo mark.
+- **Reference mark** (score 700, 19% of the room between − and +, 0.875–1.625rem): "A4 = 440 Hz" in the legend, the twin of the metronome's tempo mark; sized to its room, so it never runs under the buttons at any text size.
 - **String numerals** (score 700, 1.0625rem, octave at 0.62em).
 - **Scale figures** (score 700, 12px; signs 9px): 0 and ±25, with engraved ♭ and ♯ at 20px at the ends (13px plain b and # in the fallback).
 - **Labels, hints, buttons**: the metronome's sans sizes (0.9375rem 600 labels, 0.8125rem hints, 1.125rem 700 Start).
 
 **The Notation Voice Rule.** Any musical quantity (a note, an octave, cents, hertz, a key) is set in the score face with engraved accidentals; every instruction is system sans.
 
-**The Engraved Fallback Rule.** If the engraved face fails (`document.fonts.load`), the root takes `no-engraved` and accidentals become plain # and b in the score face: in the HTML, at the scale's ends and in the trace labels alike. Native select menus (the temperament root) are drawn by the platform in its own face, so they show its ♯ and ♭.
+**The Engraved Fallback Rule.** If the engraved face fails (`document.fonts.load`), the root takes `no-engraved` and accidentals become plain # and b in the score face: in the HTML, at the scale's ends and in the trace labels alike. Native select menus (the temperament root) and hover tooltips are drawn by the platform in its own face, so they show its ♯ and ♭.
 
 ## Layout
 
-A single column, max 1080px with 16px gutters (32px from 900px), the stage first and filling the first viewport: the note mark (max 440px: ♭ disc, note disc and readout, ♯ disc), then the chart (max 560px: strobe, 46px scale, the paper as tall as `clamp(132px, 100svh - 610px, 340px)`, or `clamp(120px, 100svh - 680px, 320px)` when the string row shows), its caption, the string numerals in instrument mode, and the transport (Calibrate, Start, Tone on a 1fr / auto / 1fr grid). From 900px the stage narrows to 760px and the legend becomes two columns. Legend rows are 64px with a 6.25rem label column; at 360px and below they stack.
+A single column, max 1080px with 16px gutters (32px from 900px), the stage first and filling the first viewport: the note mark (max 440px: ♭ disc, note disc and readout, ♯ disc), then the chart (max 560px: strobe, 46px scale, the paper as tall as `clamp(132px, 100svh - 610px, 340px)`, or `clamp(120px, 100svh - 680px, 320px)` when the string row shows), its caption, the string numerals in instrument mode, and the transport (Calibrate, Start, Tone on a 1fr / auto / 1fr grid). From 900px the stage narrows to 760px and the legend becomes two columns. Legend rows are 64px with a 6.25rem label column; at 380px and below they stack, label over control, so five segments keep 44px.
 
 ## Elevation & Depth
 
@@ -219,7 +219,7 @@ Circles for the note disc, step discs, string numerals, the pen point and the si
 44px circles in a centred row, one per string. Path ring; chalk ring when that string is being heard; yellow when locked; solid chalk when in tune.
 
 ### Buttons, segments, selects, sliders, toast
-As the metronome: Start is the yellow pill with the lift; secondary pills with rule borders (Calibrate and Tone take the yellow edge and 18% tint when active); 52px step discs (44px in the legend) with hold-to-repeat on the reference; segments 48px with score-face note names; selects with drawn chevrons; sliders with a 4px track and a 22px thumb in a 44px hit area. The sensitivity slider pairs with a 14px signal lamp, a ring that fills chalk while the input passes the gate. Every target is at least 44px: the language pills, Install, the toast's action and close buttons. The toast's polite live region is always in the page; problems (microphone refused, audio interrupted) stay until closed, plain messages for at least 6s and never while hovered or focused. A switch under the shortcuts turns the letter shortcuts off.
+As the metronome: Start is the yellow pill with the lift; secondary pills with rule borders (Calibrate and Tone take the yellow edge and 18% tint when active); 52px step discs (44px in the legend) with hold-to-repeat on the reference; segments 48px with score-face note names; selects with drawn chevrons; sliders with a 4px track and a 22px thumb in a 44px hit area. The sensitivity slider pairs with a 14px signal lamp, a ring that fills chalk while the input passes the gate. Every target is at least 44px (the language pills, Install, the toast's action and close buttons included); the one exception is a seven-string row below about 350px wide, whose circles shrink to fit (about 36px at 320px) once the gaps are down to 4px. The toast's polite live region is always in the page; problems (microphone refused, audio interrupted) stay until closed, plain messages for at least 6s and never while hovered or focused. A switch under the shortcuts turns the letter shortcuts off.
 
 ### Theme, motion and access modes
 - **Light/dark:** follows the system; every token has both values, and the canvas reads its colours from CSS swatches so it follows too.
@@ -238,5 +238,5 @@ As the metronome: Start is the yellow pill with the lift; secondary pills with r
 ### Don't:
 - **Don't** flash, pulse or animate anything that is not a reading.
 - **Don't** add a second accent hue, or tint surfaces with yellow beyond the pressed 18% mix.
-- **Don't** use Unicode music symbols in a system face; accidentals come from the engraved subset or fall back to # and b (native select menus excepted, which the platform draws).
+- **Don't** use Unicode music symbols in a system face; accidentals come from the engraved subset or fall back to # and b (native select menus and tooltips excepted, which the platform draws).
 - **Don't** replace the pen and paper with a swinging-needle gauge; the scale and trace are the meter.

@@ -38,8 +38,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
         // Take control of the page that installed the worker, so "Ready to work offline" is true
-        // at once: the capture worklet and analysis worker load lazily, at the first Start.
-        // Updates still wait for the user (no skipWaiting).
+        // at once: the capture worklet loads lazily, at the first Start. Updates still wait for
+        // the user (no skipWaiting).
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',

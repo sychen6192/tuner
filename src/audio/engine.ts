@@ -4,8 +4,8 @@ import type { Reading } from '../core/analyser'
 import type { AnalysisCommand, AnalysisResult } from './messages'
 import { ReferenceTone } from './tone'
 
-/** Why listening could not start. */
-export type ListenError = 'denied' | 'no-device' | 'busy' | 'insecure' | 'unsupported' | 'failed'
+/** Why listening could not start ('reload': part of the app failed to load; a retry won't help). */
+export type ListenError = 'denied' | 'no-device' | 'busy' | 'insecure' | 'unsupported' | 'failed' | 'reload'
 
 export class ListenFailure extends Error {
   constructor(readonly reason: ListenError) {
@@ -155,6 +155,8 @@ export class TunerEngine {
       const state: string = ctx.state
       const own = this.suspending
       this.suspending = false
+      // Back from an interruption (iOS resumes the context itself) with nothing to do: sleep again.
+      if (state === 'running' && !this.running && !this.tone.playing) this.scheduleSuspend()
       if (state === 'running' || (state === 'suspended' && own)) return
       if (this.running && this.capture) {
         this.stop()
@@ -174,7 +176,7 @@ export class TunerEngine {
     // fault, whatever DOMException addModule() rejects with.
     this.moduleReady ??= ctx.audioWorklet.addModule(captureUrl).catch(() => {
       this.moduleReady = null
-      throw new ListenFailure('failed')
+      throw new ListenFailure('reload')
     })
     return this.moduleReady
   }

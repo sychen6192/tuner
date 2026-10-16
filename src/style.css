@@ -658,13 +658,14 @@ button svg {
 
 /* ---------------------------------------------------------------- strings */
 
-/* Up to 44 px each; seven strings on a 320 px phone shrink a little rather than overflow. */
+/* Up to 44 px each, the gaps giving way first; only where even 4 px gaps leave too little room
+   (seven strings below about 350 px) do the circles shrink rather than overflow. */
 .strings {
   --count: 6;
   display: grid;
   grid-template-columns: repeat(var(--count), minmax(0, 44px));
   justify-content: center;
-  gap: clamp(4px, 2vw, 18px);
+  gap: clamp(4px, (100% - var(--count) * 44px) / (var(--count) - 1), 18px);
 }
 
 /* String numerals are the target buttons: ring = listening for it, yellow = locked, chalk = in tune. */
@@ -859,19 +860,26 @@ button svg {
   flex: none;
 }
 
-/* Takes the room between − and +, so the buttons stay put as the figures change width. */
+/* Takes the room between − and +, so the buttons stay put as the figures change width, and sizes
+   the figures to that room (container units), so they never run under the buttons, whatever the
+   text size. */
 .reference-mark {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: baseline;
-  gap: 0.22em;
+  flex: 1 1 0;
   min-width: 0;
+  container-type: inline-size;
+}
+
+.reference-figures {
+  display: flex;
+  align-items: baseline;
   justify-content: center;
+  gap: 0.22em;
   font-family: var(--score);
-  font-size: clamp(1.25rem, 5.6vw, 1.625rem);
+  font-size: clamp(0.875rem, 19cqi, 1.625rem);
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
 }
 
 .reference-octave {
@@ -1198,12 +1206,15 @@ button svg {
 
 /* ---------------------------------------------------------------- sizes */
 
-@media (max-width: 360px) {
+/* Narrow phones: legend rows stack, label over control, so five segments keep 44 px. */
+@media (max-width: 380px) {
   .row {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
+}
 
+@media (max-width: 360px) {
   .note-mark {
     --step: 46px;
   }
